@@ -64,3 +64,12 @@ make install
 
 ## Pip
 pip install pymongo
+
+## Display
+xset -dpms
+xset s noblank
+xset s off
+apt-get install unclutter
+cp configs/rc.local /etc/
+chmod +x /etc/rc.local
+

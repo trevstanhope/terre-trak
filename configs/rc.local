@@ -6,11 +6,8 @@
 # Make sure that the script will "exit 0" on success or any other
 # value on error.
 #
-# In order to enable or disable this script just change the execution
-# bits.
-#
-# By default this script does nothing.
-sudo gpsd /dev/ttyS0
-sudo rmmod uvcvideo
-sudo modprobe uvcvideo nodrop=1 timeout=10 quirks=0x80
+gpsd /dev/ttyS0
+#rmmod uvcvideo
+#modprobe uvcvideo nodrop=1 timeout=10 quirks=0x80
+startx
 exit 0
