@@ -1,5 +1,5 @@
 """
-AutoTill 2.0
+Agri-Vision
 McGill University, Department of Bioresource Engineering
 """
 
@@ -8,15 +8,15 @@ __version__ = '2.0.'
 
 ## Libraries
 import cv2, cv
-import serial # Electro-hydraulic controller
-import pymongo # DB
-from bson import json_util # DB
-from pymongo import MongoClient # DB
+import serial
+import pymongo
+from bson import json_util
+from pymongo import MongoClient
 import json
-import numpy # Curve
-from matplotlib import pyplot as plt # Display
-import thread # GPS
-import gps # GPS
+import numpy
+from matplotlib import pyplot as plt
+import thread
+import gps
 import time 
 import sys
 from datetime import datetime
@@ -258,7 +258,7 @@ class Cultivator:
         print('\tPWM Output: %s' % str(pwm))
         return pwm
     
-    ## Logs to Mongo
+    ## Log to Mongo
     """
     1. Log results to the database
     2. Returns Doc ID
@@ -323,9 +323,9 @@ class Cultivator:
                 elif average - self.PIXEL_CENTER< 0:
                     average_str = str("%2.2f cm" % ((average - self.PIXEL_CENTER) / float(self.PIXEL_PER_CM)))
                 cv2.putText(output_large, average_str, (340,735), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 5)
-                cv2.namedWindow('AutoTill', cv2.WINDOW_NORMAL)
-                cv2.setWindowProperty('AutoTill', cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
-                cv2.imshow('AutoTill', output_large)
+                cv2.namedWindow('Agri-Vision', cv2.WINDOW_NORMAL)
+                if self.FULLSCREEN: cv2.setWindowProperty('Agri-Vision', cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
+                cv2.imshow('Agri-Vision', output_large)
                 if cv2.waitKey(5) == 3:
                     pass
             except Exception as error:
@@ -353,19 +353,16 @@ class Cultivator:
     """
     def close(self):
         if self.VERBOSE: print('[Shutting Down] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
-        ## Close windows
-        cv2.destroyAllWindows()
-        ## Disable arduino
+        cv2.destroyAllWindows() ## Close windows
         try:
             if self.VERBOSE: print('\tClosing Arduino')
-            self.arduino.close()
+            self.arduino.close() ## Disable arduino
         except Exception as error:
             print('\tERROR in close(): %s' % str(error))
-        ## Disable cameras
         for i in range(len(self.cameras)):
             try:
                 if self.VERBOSE: print('\tClosing Camera #%d' % i)
-                self.cameras[i].release()
+                self.cameras[i].release() ## Disable cameras
             except Exception as error:
                 print('\tERROR in close(): %s' % str(error))
                 

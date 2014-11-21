@@ -1,4 +1,5 @@
 {
+    "FULLSCREEN" : false,
     "CAMERAS" : [0,1],
     "FREQUENCY_LIMIT" : 50,
     "PIXEL_WIDTH" : 160,
