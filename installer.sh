@@ -74,4 +74,6 @@ apt-get install unclutter
 cp configs/rc.local /etc/
 chmod +x /etc/rc.local
 cp configs/unclutter /etc/default/
+cp configs/grub /etc/default
+update-grub
 
