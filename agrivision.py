@@ -24,9 +24,9 @@ import ast
 
 ## Constants
 try:
-    CONFIG_FILE = sys.argv[1]
+    CONFIG_FILE = 'configs/' + sys.argv[1] + '.json'
 except Exception as err:
-    CONFIG_FILE = 'settings.json'
+    CONFIG_FILE = 'configs/default.json'
 
 ## Class
 class Cultivator:
