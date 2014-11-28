@@ -43,27 +43,27 @@ class Cultivator:
         
         # Cameras
         if self.VERBOSE: print('[Initialing Cameras] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
-        print('\tImage Width: %d px' % self.PIXEL_WIDTH)
-        print('\tImage Height: %d px' % self.PIXEL_HEIGHT)
-        print('\tCamera Height: %d cm' % self.CAMERA_HEIGHT)
+        print('\tCamera Width: %d px' % self.CAMERA_WIDTH)
+        print('\tCamera Height: %d px' % self.CAMERA_HEIGHT)
+        print('\tCamera Depth: %d cm' % self.CAMERA_DEPTH)
         print('\tCamera FOV: %f rad' % self.CAMERA_FOV)
-        self.PIXEL_CENTER = self.PIXEL_WIDTH / 2
-        if self.VERBOSE: print('\tImage Center: %d px' % self.PIXEL_CENTER)
-        self.GROUND_WIDTH = 2 * self.CAMERA_HEIGHT * numpy.tan(self.CAMERA_FOV / 2.0)
+        self.CAMERA_CENTER = self.CAMERA_WIDTH / 2
+        if self.VERBOSE: print('\tImage Center: %d px' % self.CAMERA_CENTER)
+        self.GROUND_WIDTH = 2 * self.CAMERA_DEPTH * numpy.tan(self.CAMERA_FOV / 2.0)
         print('\tGround Width: %d cm' % self.GROUND_WIDTH)
         print('\tBrush Range: +/- %d cm' % self.BRUSH_RANGE)
-        self.PIXEL_PER_CM = self.PIXEL_WIDTH / self.GROUND_WIDTH
+        self.PIXEL_PER_CM = self.CAMERA_WIDTH / self.GROUND_WIDTH
         print('\tPixel-per-cm: %d px/cm' % self.PIXEL_PER_CM)
         self.PIXEL_RANGE = int(self.PIXEL_PER_CM * self.BRUSH_RANGE) 
         print('\tPixel Range: +/- %d px' % self.PIXEL_RANGE)
-        self.PIXEL_MIN = self.PIXEL_CENTER - self.PIXEL_RANGE
-        self.PIXEL_MAX = self.PIXEL_CENTER + self.PIXEL_RANGE
+        self.PIXEL_MIN = self.CAMERA_CENTER - self.PIXEL_RANGE
+        self.PIXEL_MAX = self.CAMERA_CENTER + self.PIXEL_RANGE
         self.cameras = []
         for i in self.CAMERAS:
             if self.VERBOSE: print('\tInitializing Camera: %d' % i)
             cam = cv2.VideoCapture(i)
-            cam.set(cv.CV_CAP_PROP_FRAME_WIDTH, self.PIXEL_WIDTH)
-            cam.set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.PIXEL_HEIGHT)
+            cam.set(cv.CV_CAP_PROP_FRAME_WIDTH, self.CAMERA_WIDTH)
+            cam.set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.CAMERA_HEIGHT)
             self.cameras.append(cam)
         
         # Initialize Database
@@ -92,19 +92,19 @@ class Cultivator:
         self.RANGE_PWM = int(self.MAX_PWM - self.MIN_PWM)
         if self.VERBOSE: print('\tRange PWM: %d' % self.RANGE_PWM)
         self.PWM_RESPONSE = []
-        for i in range(self.PIXEL_WIDTH):
-            if i <= (self.PIXEL_CENTER - self.PIXEL_RANGE):
+        for i in range(self.CAMERA_WIDTH):
+            if i <= (self.CAMERA_CENTER - self.PIXEL_RANGE):
                 val = self.MAX_PWM
-            elif i >= (self.PIXEL_CENTER + self.PIXEL_RANGE):
+            elif i >= (self.CAMERA_CENTER + self.PIXEL_RANGE):
                 val = self.MIN_PWM
             else:
-                val = int(self.MAX_PWM - (self.CENTER_PWM + float(self.RANGE_PWM) * (i - self.PIXEL_CENTER - 2) / float(2 * self.PIXEL_RANGE)))
+                val = int(self.MAX_PWM - (self.CENTER_PWM + float(self.RANGE_PWM) * (i - self.CAMERA_CENTER - 2) / float(2 * self.PIXEL_RANGE)))
             self.PWM_RESPONSE.append(val)
         if self.VERBOSE: print(self.PWM_RESPONSE)
     
         # Offset History
         if self.VERBOSE: print('\tDefault Number of Averages: %d' % self.NUM_AVERAGES)
-        self.offset_history = [self.PIXEL_CENTER] * self.NUM_AVERAGES
+        self.offset_history = [self.CAMERA_CENTER] * self.NUM_AVERAGES
         
         # Arduino Connection
         if self.VERBOSE: print('[Initializing Arduino] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
@@ -218,7 +218,7 @@ class Cultivator:
             estimated =  int(numpy.mean(indices))
         except Exception as error:
             print('\tERROR in estimate_row(): %s' % str(error))
-            estimated = self.PIXEL_CENTER
+            estimated = self.CAMERA_CENTER
         print('\tEstimated Offset: %s' % str(estimated))
         return estimated
         
@@ -303,6 +303,7 @@ class Cultivator:
 	while True:
             if self.VERBOSE: print('[Displaying Images] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
             try:
+		pwm = self.pwm
                 average = self.average
                 estimated = self.estimated
                 masks = self.masks
@@ -310,19 +311,24 @@ class Cultivator:
                 cam0 = self.cam0
                 cam1 = self.cam1
                 output_images = []
-                for img,mask in zip(images, masks):
-                    cv2.line(img, (self.PIXEL_MIN, 0), (self.PIXEL_MIN, self.PIXEL_HEIGHT), (0,0,255), 1)
-                    cv2.line(img, (self.PIXEL_MAX, 0), (self.PIXEL_MAX, self.PIXEL_HEIGHT), (0,0,255), 1)
-                    cv2.line(img, (average, 0), (average, self.PIXEL_HEIGHT), (0,255,0), 2)
-                    cv2.line(img, (self.PIXEL_CENTER, 0), (self.PIXEL_CENTER, self.PIXEL_HEIGHT), (255,255,255), 1)
-                    output_images.append(numpy.vstack([img, numpy.zeros((20, self.PIXEL_WIDTH, 3), numpy.uint8)]))
+		distance = round((average - self.CAMERA_CENTER) / float(self.PIXEL_PER_CM), 1)
+		volts = round((pwm * (self.MAX_VOLTAGE - self.MIN_VOLTAGE) / (self.MAX_PWM - self.MIN_PWM) + self.MIN_VOLTAGE), 2)
+                blank = numpy.zeros((self.CAMERA_HEIGHT, self.CAMERA_WIDTH), numpy.uint8)
+		for img,mask in zip(images, masks):
+                    cv2.line(img, (self.PIXEL_MIN, 0), (self.PIXEL_MIN, self.CAMERA_HEIGHT), (0,0,255), 1)
+                    cv2.line(img, (self.PIXEL_MAX, 0), (self.PIXEL_MAX, self.CAMERA_HEIGHT), (0,0,255), 1)
+                    cv2.line(img, (average, 0), (average, self.CAMERA_HEIGHT), (0,255,0), 2)
+                    cv2.line(img, (self.CAMERA_CENTER, 0), (self.CAMERA_CENTER, self.CAMERA_HEIGHT), (255,255,255), 1)
+                    output_images.append(numpy.vstack([img, numpy.zeros((20, self.CAMERA_WIDTH, 3), numpy.uint8)])) #add blank space at bottom of images
                 output_small = numpy.hstack(output_images)
                 output_large = cv2.resize(output_small, (1024, 768))
-                if average - self.PIXEL_CENTER >= 0:
-                    average_str = str("+%2.2f cm" % ((average - self.PIXEL_CENTER) / float(self.PIXEL_PER_CM)))
-                elif average - self.PIXEL_CENTER< 0:
-                    average_str = str("%2.2f cm" % ((average - self.PIXEL_CENTER) / float(self.PIXEL_PER_CM)))
-                cv2.putText(output_large, average_str, (340,735), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 5)
+                if average - self.CAMERA_CENTER >= 0:
+                    distance_str = str("+%2.1f cm" % distance)
+                elif average - self.CAMERA_CENTER< 0:
+                    distance_str = str("%2.1f cm" % distance)
+		volts_str = str("%2.1f V" % volts)
+                cv2.putText(output_large, distance_str, (340,760), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
+                cv2.putText(output_large, volts_str, (840,760), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
                 cv2.namedWindow('Agri-Vision', cv2.WINDOW_NORMAL)
                 if self.FULLSCREEN: cv2.setWindowProperty('Agri-Vision', cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
                 cv2.imshow('Agri-Vision', output_large)
@@ -408,16 +414,16 @@ class Cultivator:
                 try:
                     cam0 = indices[0]
                 except Exception:
-                    cam0 = self.PIXEL_CENTER
+                    cam0 = self.CAMERA_CENTER
                 try:
                     cam1 = indices[1]
                 except Exception:
-                    cam1 = self.PIXEL_CENTER
+                    cam1 = self.CAMERA_CENTER
                 sample = {
-                    'cam0' : cam0 - self.PIXEL_CENTER, 
-                    'cam1' : cam1 - self.PIXEL_CENTER, 
-                    'estimate' : estimated - self.PIXEL_CENTER,
-                    'average' : average - self.PIXEL_CENTER,
+                    'cam0' : cam0 - self.CAMERA_CENTER, 
+                    'cam1' : cam1 - self.CAMERA_CENTER, 
+                    'estimate' : estimated - self.CAMERA_CENTER,
+                    'average' : average - self.CAMERA_CENTER,
                     'pwm': pwm,
                     'time' : datetime.strftime(datetime.now(), self.TIME_FORMAT),
                     'frequency' : frequency,
@@ -425,6 +431,7 @@ class Cultivator:
                     'lat' : self.latitude,
                     'speed' : self.speed,
                 }
+		self.pwm = pwm
                 self.images = images
                 self.masks = masks
                 self.average = average
