@@ -76,4 +76,6 @@ chmod +x /etc/rc.local
 cp configs/unclutter /etc/default/
 cp configs/grub /etc/default
 update-grub
+cp configs/interfaces /etc/network
+
 
