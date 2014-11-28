@@ -1,6 +1,5 @@
 #!/bin/sh
 xset s noblank
-xset s off
-xset dpms force on
+xset s off -dpms
 cd /root/agri-vision
 python agrivision.py fullscreen
