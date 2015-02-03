@@ -1,7 +1,7 @@
 #!/bin/sh
 # Rehydrate INSTALLER
-# WARNING: 
-# DISCLAIMER: This software is distributed with 
+# WARNING: This software makes significant changes to the system behavior
+# DISCLAIMER: This software is distributed with no warranty.
 
 read -p "Are you sure you want to install [y/n]? " ans
 if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
