@@ -1,5 +1,5 @@
-# Computer Vision Guidance System for Rowcrop Cultivators  (CVGSRC)
-Multi-camera computer-vision guidance system for rowcrop cultivators
+# Agri-Vision
+Multi-camera computer-vision guidance system for row-crop cultivators
 
 ## Installation
 * Requires SciPy 0.11 or higher
@@ -11,9 +11,3 @@ To install the system, simply run the install script:
     
     sh install.sh
     
-## GPS
-sudo gpsd /dev/ttyS0
-
-## VideoCapture
-sudo rmmod uvcvideo
-sudo modprobe uvcvideo nodrop=1 timeout=5000 quirks=0x80
