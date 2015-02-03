@@ -1,15 +1,33 @@
 #!/bin/sh
+# Rehydrate INSTALLER
+# WARNING: 
+# DISCLAIMER: This software is distributed with 
 
-update-rc.d -f lightdm remove
-xset -dpms
-xset s noblank
-xset s off
-apt-get install unclutter
-cp configs/rc.local /etc/
-chmod +x /etc/rc.local
-cp configs/unclutter /etc/default/
-cp configs/grub /etc/default
-update-grub
-cp configs/interfaces /etc/network
-
-
+read -p "Are you sure you want to install [y/n]? " ans
+if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
+    then
+        echo "Removing LightDM..."
+        update-rc.d -f lightdm remove
+        
+        echo "Disabling Screen Blanking..."
+        xset -dpms
+        xset s noblank
+        xset s off
+        apt-get install unclutter
+        cp configs/unclutter /etc/default/
+        
+        echo "Installing to Boot Path..."
+        cp configs/rc.local /etc/
+        chmod +x /etc/rc.local
+        
+        echo "Updating Custom Grub..."
+        cp configs/grub /etc/default
+        update-grub
+        
+        echo "Reconfiguring Network Interfaces..."
+        cp configs/interfaces /etc/network
+fi
+if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
+    then
+        echo "Aborting..."
+fi
