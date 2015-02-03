@@ -24,16 +24,20 @@ import ast
 
 ## Constants
 try:
-    CONFIG_FILE = 'configs/' + sys.argv[1] + '.json'
+    CONFIG_FILE = 'modes/%s.json' % sys.argv[1]
 except Exception as err:
-    CONFIG_FILE = 'configs/default.json'
+    CONFIG_FILE = 'modes/default.json'
+
+def pretty_print(task, msg, *args):
+    date = datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
+    print "%s %s %s" % (date, task, msg)
 
 ## Class
 class Cultivator:
     def __init__(self, config_file):
 
         # Load Config
-        print('\tLoading config file: %s' % config_file)
+        pretty_print("CONFIG", "Loading %s" % config_file)
         self.config = json.loads(open(config_file).read())
         for key in self.config:
             try:
@@ -41,37 +45,48 @@ class Cultivator:
             except AttributeError as error:
                 setattr(self, key, self.config[key])
         
-        # Cameras
-        if self.VERBOSE: print('[Initialing Cameras] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
-        print('\tCamera Width: %d px' % self.CAMERA_WIDTH)
-        print('\tCamera Height: %d px' % self.CAMERA_HEIGHT)
-        print('\tCamera Depth: %d cm' % self.CAMERA_DEPTH)
-        print('\tCamera FOV: %f rad' % self.CAMERA_FOV)
+        # Initializers
+        self.init_cameras()
+        self.init_arduino()
+        self.init_pid()
+        self.init_db()
+        self.init_gps()
+        self.init_display()
+        
+    # Initialize Cameras
+    def init_cameras(self):
+        if self.VERBOSE:
+            pretty_print('CAMERA', 'Initialing Cameras')
+            pretty_print('CAMERA', 'Camera Height: %d px' % self.CAMERA_HEIGHT)
+            pretty_print('CAMERA', 'Camera Depth: %d cm' % self.CAMERA_DEPTH)
+            pretty_print('CAMERA', 'Camera FOV: %f rad' % self.CAMERA_FOV)
         self.CAMERA_CENTER = self.CAMERA_WIDTH / 2
-        if self.VERBOSE: print('\tImage Center: %d px' % self.CAMERA_CENTER)
+        if self.VERBOSE: 
+            pretty_print('INIT', 'Image Center: %d px' % self.CAMERA_CENTER)
         self.GROUND_WIDTH = 2 * self.CAMERA_DEPTH * numpy.tan(self.CAMERA_FOV / 2.0)
-        print('\tGround Width: %d cm' % self.GROUND_WIDTH)
-        print('\tBrush Range: +/- %d cm' % self.BRUSH_RANGE)
+        pretty_print('CAMERA', 'Ground Width: %d cm' % self.GROUND_WIDTH)
+        pretty_print('CAMERA', 'Brush Range: +/- %d cm' % self.BRUSH_RANGE)
         self.PIXEL_PER_CM = self.CAMERA_WIDTH / self.GROUND_WIDTH
-        print('\tPixel-per-cm: %d px/cm' % self.PIXEL_PER_CM)
+        pretty_print('CAMERA', 'Pixel-per-cm: %d px/cm' % self.PIXEL_PER_CM)
         self.PIXEL_RANGE = int(self.PIXEL_PER_CM * self.BRUSH_RANGE) 
-        print('\tPixel Range: +/- %d px' % self.PIXEL_RANGE)
+        pretty_print('CAMERA', 'Pixel Range: +/- %d px' % self.PIXEL_RANGE)
         self.PIXEL_MIN = self.CAMERA_CENTER - self.PIXEL_RANGE
         self.PIXEL_MAX = self.CAMERA_CENTER + self.PIXEL_RANGE
         self.cameras = []
         for i in self.CAMERAS:
-            if self.VERBOSE: print('\tInitializing Camera: %d' % i)
+            if self.VERBOSE: pretty_print('CAMERA', 'Initializing Camera: %d' % i)
             cam = cv2.VideoCapture(i)
             cam.set(cv.CV_CAP_PROP_FRAME_WIDTH, self.CAMERA_WIDTH)
             cam.set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.CAMERA_HEIGHT)
             self.cameras.append(cam)
-        
-        # Initialize Database
+    
+    # Initialize Database
+    def init_db(self):
         self.LOG_NAME = datetime.strftime(datetime.now(), self.LOG_FORMAT)
         self.MONGO_NAME = datetime.strftime(datetime.now(), self.MONGO_FORMAT)
-        if self.VERBOSE: print('[Initialing MongoDB] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
-        if self.VERBOSE: print('\tConnecting to MongoDB: %s' % self.MONGO_NAME)
-        if self.VERBOSE: print('\tNew session: %s' % self.LOG_NAME)
+        if self.VERBOSE: pretty_print('DB', 'Initializing MongoDB')
+        if self.VERBOSE: pretty_print('DB', 'Connecting to MongoDB: %s' % self.MONGO_NAME)
+        if self.VERBOSE: pretty_print('DB', 'New session: %s' % self.LOG_NAME)
         try:
             self.client = MongoClient()
             self.database = self.client[self.MONGO_NAME]
@@ -79,63 +94,53 @@ class Cultivator:
             self.log = open('logs/' + self.LOG_NAME + '.csv', 'w')
             self.log.write(','.join(['time', 'lat', 'long', 'speed', 'cam0', 'cam1', 'estimate', 'average', 'pwm','\n']))
         except Exception as error:
-            print('\tERROR in __init__(): %s' % str(error))
-        
-        # PWM Response Range for Electrohyraulic-Control
-        if self.VERBOSE: print('[Initialing Electro-Hydraulics] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
-        self.MIN_PWM = int(255 * self.MIN_VOLTAGE / self.SUPPLY_VOLTAGE)
-        if self.VERBOSE: print('\tPWM at Minimum: %d' % self.MIN_PWM)
-        self.MAX_PWM = int(255 * self.MAX_VOLTAGE / self.SUPPLY_VOLTAGE)
-        if self.VERBOSE: print('\tPWM at Maximum: %d' % self.MAX_PWM)
-        self.CENTER_PWM = int(self.MIN_PWM + self.MAX_PWM / 2.0)
-        if self.VERBOSE: print('\tPWM at Center: %d' % self.CENTER_PWM)
-        self.RANGE_PWM = int(self.MAX_PWM - self.MIN_PWM)
-        if self.VERBOSE: print('\tRange PWM: %d' % self.RANGE_PWM)
-        self.PWM_RESPONSE = []
-        for i in range(self.CAMERA_WIDTH):
-            if i <= (self.CAMERA_CENTER - self.PIXEL_RANGE):
-                val = self.MAX_PWM
-            elif i >= (self.CAMERA_CENTER + self.PIXEL_RANGE):
-                val = self.MIN_PWM
-            else:
-                val = int(self.MAX_PWM - (self.CENTER_PWM + float(self.RANGE_PWM) * (i - self.CAMERA_CENTER - 2) / float(2 * self.PIXEL_RANGE)))
-            self.PWM_RESPONSE.append(val)
-        if self.VERBOSE: print(self.PWM_RESPONSE)
+            pretty_print('\tERROR', str(error))
     
-        # Offset History
-        if self.VERBOSE: print('\tDefault Number of Averages: %d' % self.NUM_AVERAGES)
+    # Initialize PID Controller
+    def init_pid(self):
+        if self.VERBOSE: pretty_print('PID', 'Initialing Electro-Hydraulics')
+        self.MIN_PWM = 0
+        if self.VERBOSE: pretty_print('PID', 'PWM Minimum: %d' % self.MIN_PWM)
+        self.MAX_PWM = 255
+        if self.VERBOSE: pretty_print('PID', 'PWM Maximum: %d' % self.MAX_PWM)
+        self.CENTER_PWM = int(self.MIN_PWM + self.MAX_PWM / 2.0)
+        if self.VERBOSE: pretty_print('PID', 'PWM Center: %d' % self.CENTER_PWM)
+        if self.VERBOSE: pretty_print('PID', 'Default Number of Averages: %d' % self.NUM_AVERAGES)
         self.offset_history = [self.CAMERA_CENTER] * self.NUM_AVERAGES
-        
-        # Arduino Connection
-        if self.VERBOSE: print('[Initializing Arduino] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
+    
+    # Initialize Arduino
+    def init_arduino(self):
+        if self.VERBOSE: pretty_print('ARDUINO', 'Initializing Arduino')
         try:
-            if self.VERBOSE: print('\tDevice: %s' % str(self.SERIAL_DEVICE))
-            if self.VERBOSE: print('\tBaud Rate: %s' % str(self.SERIAL_BAUD))
+            if self.VERBOSE: pretty_print('ARDUINO', 'Device: %s' % str(self.SERIAL_DEVICE))
+            if self.VERBOSE: pretty_print('ARDUINO', 'Baud Rate: %s' % str(self.SERIAL_BAUD))
             self.arduino = serial.Serial(self.SERIAL_DEVICE, self.SERIAL_BAUD)
         except Exception as error:
-            print('\tERROR in __init__(): %s' % str(error))
-        
-        # GPS
-        if self.VERBOSE: print('[Initializing GPS] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
+            if self.VERBOSE: pretty_print('ERROR', str(error))
+    
+    # Initialize GPS
+    def init_gps(self):
+        if self.VERBOSE: pretty_print('GPS', 'Initializing GPS')
         if self.GPS_ENABLED:
             try:
-                if self.VERBOSE: print('\tWARNING: Enabing GPS')
+                if self.VERBOSE: pretty_print('GPS', 'WARNING: Enabing GPS')
                 self.gpsd = gps.gps()
                 self.gpsd.stream(gps.WATCH_ENABLE)
                 thread.start_new_thread(self.update_gps, ())
             except Exception as err:
-                print('\tERROR in __init__(): GPS not available! %s' % str(err))
+                pretty_print('ERROR', 'GPS not available! %s' % str(err))
                 self.latitude = 0
                 self.longitude = 0
                 self.speed = 0
         else:
-            print('\tWARNING: GPS Disabled')
+            pretty_print('GPS', 'WARNING: GPS Disabled')
             self.latitude = 0
             self.longitude = 0
             self.speed = 0
-
-        # Display
-        if self.VERBOSE: print('[Initializing Display] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
+    
+    # Display
+    def init_display(self):
+        if self.VERBOSE: pretty_print('INIT', 'Initializing Display')
         if self.DISPLAY_ON:
             thread.start_new_thread(self.update_display, ())
 
@@ -145,17 +150,17 @@ class Cultivator:
     2. Repeat for each capture interface
     """
     def capture_images(self):
-        if self.VERBOSE: print('[Capturing Images] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
+        if self.VERBOSE: pretty_print('CAMERA', 'Capturing Images')
         images = []
         for cam in self.cameras:
-            if self.VERBOSE: print('\tCamera ID: %s' % str(cam))
+            if self.VERBOSE: pretty_print('CAMERA', 'Camera ID: %s' % str(cam))
             (s, bgr) = cam.read() 
             if s:
                 images.append(bgr)
-        if self.VERBOSE: print('\tImages captured: %d' % len(images))
+        if self.VERBOSE: pretty_print('CAMERA', 'Images captured: %d' % len(images))
         return images
         
-    ## Green Filter
+    ## Plant Segmentation Filter
     """
     1. RBG --> HSV
     2. Set minimum saturation equal to the mean saturation
@@ -163,7 +168,6 @@ class Cultivator:
     4. Take hues within range from green-yellow to green-blue
     """
     def plant_filter(self, images):
-        if self.VERBOSE: print('[Filtering for Plants] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
         masks = []
         for bgr in images:
             try:
@@ -179,8 +183,8 @@ class Cultivator:
                 mask = cv2.inRange(hsv, threshold_min, threshold_max)
                 masks.append(mask) 
             except Exception as error:
-                print('\tERROR in plant_filter(): %s' % str(error))        
-        if self.VERBOSE: print('\tNumber of Masks: %d mask(s) ' % len(masks))
+                pretty_print('CV', str(error))        
+        if self.VERBOSE: pretty_print('CV', 'Number of Masks: %d mask(s) ' % len(masks))
         return masks
         
     ## Find Plants
@@ -192,7 +196,6 @@ class Cultivator:
     5. Repeat for each mask
     """
     def find_indices(self, masks):
-        if self.VERBOSE: print('[Finding Offsets] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
         indices = []
         for mask in masks:
             try:
@@ -203,39 +206,33 @@ class Cultivator:
                 centroid = int(numpy.median(probable[0]))
                 indices.append(centroid)
             except Exception as error:
-                print('\tERROR in find_indices(): %s' % str(error))
-        if self.VERBOSE: print('\tDetected Indices: %s' % str(indices))
+                pretty_print('ERROR', '%s' % str(error))
+        if self.VERBOSE: pretty_print('CV', 'Detected Indices : %s' % str(indices))
         return indices
         
     ## Best Guess for row based on multiple offsets from indices
     """
     1. If outside bounds, default to edges
     2. If inside, use mean of detected indices from both cameras
-    """
-    def estimate_row(self, indices):
-        if self.VERBOSE: print('[Making Best Guess of Crop Row] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
-        try:
-            estimated =  int(numpy.mean(indices))
-        except Exception as error:
-            print('\tERROR in estimate_row(): %s' % str(error))
-            estimated = self.CAMERA_CENTER
-        print('\tEstimated Offset: %s' % str(estimated))
-        return estimated
-        
-    ## Estimate Average Position
-    """
     1. Takes the current assumed offset and number of averages
     2. Calculate weights of previous offsets
     3. Estimate the weighted position of the crop row (in pixels)
     """
-    def average_row(self, offset):
-        if self.VERBOSE: print('[Estimating Row Position] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
-        self.offset_history.append(offset)
+    def estimate_row(self, indices):
+        try:
+            estimated =  int(numpy.mean(indices))
+        except Exception as error:
+            pretty_print('ERROR', str(error))
+            estimated = self.CAMERA_CENTER
+        if self.VERBOSE: pretty_print('ROW', 'Estimated Offset: %s' % str(estimated))
+        self.offset_history.append(estimated)
         while len(self.offset_history) > self.NUM_AVERAGES:
             self.offset_history.pop(0)
         average = int(numpy.mean(self.offset_history)) #!TODO
-        print('\tMoving Average: %s' % str(average)) 
-        return average
+        if self.VERBOSE: pretty_print('ROW', 'Moving Average: %s' % str(average)) 
+        differential = estimated - average
+        if self.VERBOSE: pretty_print('ROW', 'Differential : %s' % str(differential)) 
+        return estimated, average, differential
          
     ## Control Hydraulics
     """
@@ -243,10 +240,11 @@ class Cultivator:
     2. Send PWM response over serial to controller
     """
     def control_hydraulics(self, estimate, average):
-        if self.VERBOSE: print('[Controlling Hydraulics] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
-        pwm_avg = self.PWM_RESPONSE[average]
-        pwm_est = self.PWM_RESPONSE[estimate]
-        pwm = int(self.CENTER_PWM + self.I_COEF * (pwm_avg - self.CENTER_PWM) + self.P_COEF * (pwm_est - self.CENTER_PWM))
+        p = (estimate - self.CAMERA_CENTER) * self.P_COEF
+        i = (average - self.CAMERA_CENTER) * self.I_COEF
+        d = (0)  * self.D_COEF
+        if self.VERBOSE: pretty_print('PID', str([p,i,d]))
+        pwm = int(p + i + d + self.CENTER_PWM)
         if pwm > self.MAX_PWM:
             pwm = self.MAX_PWM
         elif pwm < self.MIN_PWM:
@@ -254,8 +252,8 @@ class Cultivator:
         try:
             self.arduino.write(str(pwm) + '\n')
         except Exception as error:
-            print('\tERROR in control_hydraulics(): %s' % str(error))
-        print('\tPWM Output: %s' % str(pwm))
+            pretty_print('ERROR', str(error))
+        if self.VERBOSE: pretty_print('ARDUINO', 'PWM Output: %s' % str(pwm))
         return pwm
     
     ## Log to Mongo
@@ -264,12 +262,12 @@ class Cultivator:
     2. Returns Doc ID
     """
     def log_db(self, sample):
-        if self.VERBOSE: print('[Logging to Database] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
+        if self.VERBOSE: pretty_print('DB', 'Logging to Database')
         try:          
             doc_id = self.collection.insert(sample)
         except Exception as error:
-            print('\tERROR in log_db(): %s' % str(error))
-        if self.VERBOSE: print('\tDoc ID: %s' % str(doc_id))
+            pretty_print('ERROR', str(error))
+        if self.VERBOSE: pretty_print('DB', 'Doc ID: %s' % str(doc_id))
         return doc_id
     
     ## Log to File
@@ -278,7 +276,7 @@ class Cultivator:
     2. For each document in session, print parameters to file
     """
     def log_file(self, sample):
-        if self.VERBOSE: print('[Logging to File] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
+        if self.VERBOSE: pretty_print('LOG', 'Logging to File')
         try:
             time = str(sample['time'])
             latitude = str(sample['lat'])
@@ -291,7 +289,7 @@ class Cultivator:
             pwm = str(sample['pwm'])
             self.log.write(','.join([time, latitude, longitude, speed, cam0, cam1, estimate, average, pwm,'\n']))
         except Exception as error:
-            print('\tERROR: %s' % str(error))
+            pretty_print('ERROR', str(error))
                 
     ## Displays 
     """
@@ -300,10 +298,10 @@ class Cultivator:
     3. Output GUI display
     """
     def update_display(self):
-	while True:
-            if self.VERBOSE: print('[Displaying Images] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
+        while True:
+            if self.VERBOSE: pretty_print('DISPLAY', 'Displaying Images')
             try:
-		pwm = self.pwm
+                pwm = self.pwm
                 average = self.average
                 estimated = self.estimated
                 masks = self.masks
@@ -311,22 +309,23 @@ class Cultivator:
                 cam0 = self.cam0
                 cam1 = self.cam1
                 output_images = []
-		distance = round((average - self.CAMERA_CENTER) / float(self.PIXEL_PER_CM), 1)
-		volts = round((pwm * (self.MAX_VOLTAGE - self.MIN_VOLTAGE) / (self.MAX_PWM - self.MIN_PWM) + self.MIN_VOLTAGE), 2)
+                distance = round((average - self.CAMERA_CENTER) / float(self.PIXEL_PER_CM), 1)
+                volts = round((pwm * (self.MAX_VOLTAGE - self.MIN_VOLTAGE) / (self.MAX_PWM - self.MIN_PWM) + self.MIN_VOLTAGE), 2)
                 blank = numpy.zeros((self.CAMERA_HEIGHT, self.CAMERA_WIDTH), numpy.uint8)
-		for img,mask in zip(images, masks):
+                for img,mask in zip(images, masks):
+                    if True: img = numpy.dstack([mask, mask, mask])
                     cv2.line(img, (self.PIXEL_MIN, 0), (self.PIXEL_MIN, self.CAMERA_HEIGHT), (0,0,255), 1)
                     cv2.line(img, (self.PIXEL_MAX, 0), (self.PIXEL_MAX, self.CAMERA_HEIGHT), (0,0,255), 1)
                     cv2.line(img, (average, 0), (average, self.CAMERA_HEIGHT), (0,255,0), 2)
                     cv2.line(img, (self.CAMERA_CENTER, 0), (self.CAMERA_CENTER, self.CAMERA_HEIGHT), (255,255,255), 1)
-                    output_images.append(numpy.vstack([img, numpy.zeros((20, self.CAMERA_WIDTH, 3), numpy.uint8)])) #add blank space at bottom of images
+                    output_images.append(numpy.vstack([img, numpy.zeros((20, self.CAMERA_WIDTH, 3), numpy.uint8)])) #add blank space
                 output_small = numpy.hstack(output_images)
                 output_large = cv2.resize(output_small, (1024, 768))
                 if average - self.CAMERA_CENTER >= 0:
                     distance_str = str("+%2.1f cm" % distance)
                 elif average - self.CAMERA_CENTER< 0:
                     distance_str = str("%2.1f cm" % distance)
-		volts_str = str("%2.1f V" % volts)
+                volts_str = str("%2.1f V" % volts)
                 cv2.putText(output_large, distance_str, (340,760), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
                 cv2.putText(output_large, volts_str, (840,760), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
                 cv2.namedWindow('Agri-Vision', cv2.WINDOW_NORMAL)
@@ -335,7 +334,7 @@ class Cultivator:
                 if cv2.waitKey(5) == 3:
                     pass
             except Exception as error:
-                print('\tERROR in display(): %s' % str(error))
+                pretty_print('DISPLAY', str(error))
                     
     ## Update GPS
     """
@@ -344,11 +343,11 @@ class Cultivator:
     """
     def update_gps(self):  
         while True:
-            print('[Updating GPS] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
             self.gpsd.next()
             self.latitude = self.gpsd.fix.latitude
             self.longitude = self.gpsd.fix.longitude
             self.speed = self.gpsd.fix.speed
+            pretty_print('GPS', '%d N %d E' % (self.latitude, self.longitude))
     
     ## Close
     """
@@ -358,31 +357,19 @@ class Cultivator:
     3. Release capture interfaces 
     """
     def close(self):
-        if self.VERBOSE: print('[Shutting Down] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
-        cv2.destroyAllWindows() ## Close windows
+        if self.VERBOSE: pretty_print('SYSTEM', 'Shutting Down')
         try:
-            if self.VERBOSE: print('\tClosing Arduino')
+            if self.VERBOSE: pretty_print('ARDUINO', 'Closing Arduino')
             self.arduino.close() ## Disable arduino
         except Exception as error:
-            print('\tERROR in close(): %s' % str(error))
+            pretty_print('ARDUINO', str(error))
         for i in range(len(self.cameras)):
             try:
-                if self.VERBOSE: print('\tClosing Camera #%d' % i)
+                if self.VERBOSE: pretty_print('CAMERA', 'Closing Camera #%d' % i)
                 self.cameras[i].release() ## Disable cameras
             except Exception as error:
-                print('\tERROR in close(): %s' % str(error))
-                
-    ## Throttle Frequency
-    """
-    1. While the frequency is less than the limit, wait
-    """ 
-    def throttle_frequency(self, start_time):
-        if self.VERBOSE: print('[Throttling Frequency] %s' % datetime.strftime(datetime.now(), self.TIME_FORMAT))
-        while (1 / (time.time() - start_time)) > self.FREQUENCY_LIMIT:
-            time.sleep(0.01)
-        frequency = 1/(time.time() - start_time)
-        if self.VERBOSE: print('\tFrequency: ' + str(frequency))
-        return frequency
+                pretty_print('\tCAMERA ERROR', str(error))
+        cv2.destroyAllWindows() ## Close windows
         
     ## Run  
     """
@@ -402,15 +389,11 @@ class Cultivator:
     def run(self):
         while True:
             try:
-                print('---------------------------------------')
-                start_time = time.time()
                 images = self.capture_images()
                 masks = self.plant_filter(images)
                 indices = self.find_indices(masks)
-                estimated = self.estimate_row(indices)
-                average = self.average_row(estimated)
+                (estimated, average, differential) = self.estimate_row(indices)
                 pwm = self.control_hydraulics(estimated, average)
-                frequency = self.throttle_frequency(start_time)
                 try:
                     cam0 = indices[0]
                 except Exception:
@@ -426,12 +409,11 @@ class Cultivator:
                     'average' : average - self.CAMERA_CENTER,
                     'pwm': pwm,
                     'time' : datetime.strftime(datetime.now(), self.TIME_FORMAT),
-                    'frequency' : frequency,
                     'long' : self.longitude,
                     'lat' : self.latitude,
                     'speed' : self.speed,
                 }
-		self.pwm = pwm
+                self.pwm = pwm
                 self.images = images
                 self.masks = masks
                 self.average = average
@@ -441,7 +423,8 @@ class Cultivator:
                 if self.MONGO_ON: doc_id = self.log_db(sample)
                 if self.LOGFILE_ON: self.log_file(sample)
             except KeyboardInterrupt as error:
-                break    
+                self.close()    
+                break
     
 ## Main
 if __name__ == '__main__':
