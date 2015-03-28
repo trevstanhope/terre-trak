@@ -13,7 +13,7 @@ import pymongo
 from bson import json_util
 from pymongo import MongoClient
 import json
-import numpy
+import numpy as np
 from matplotlib import pyplot as plt
 import thread
 import gps
@@ -33,7 +33,7 @@ def pretty_print(task, msg, *args):
     print "%s %s %s" % (date, task, msg)
 
 ## Class
-class Cultivator:
+class AgriVision:
     def __init__(self, config_file):
 
         # Load Config
@@ -55,15 +55,15 @@ class Cultivator:
         
     # Initialize Cameras
     def init_cameras(self):
+        pretty_print('CAMERA', 'Initializing Cameras')
         if self.VERBOSE:
-            pretty_print('CAMERA', 'Initialing Cameras')
             pretty_print('CAMERA', 'Camera Height: %d px' % self.CAMERA_HEIGHT)
             pretty_print('CAMERA', 'Camera Depth: %d cm' % self.CAMERA_DEPTH)
             pretty_print('CAMERA', 'Camera FOV: %f rad' % self.CAMERA_FOV)
         self.CAMERA_CENTER = self.CAMERA_WIDTH / 2
         if self.VERBOSE: 
             pretty_print('INIT', 'Image Center: %d px' % self.CAMERA_CENTER)
-        self.GROUND_WIDTH = 2 * self.CAMERA_DEPTH * numpy.tan(self.CAMERA_FOV / 2.0)
+        self.GROUND_WIDTH = 2 * self.CAMERA_DEPTH * np.tan(self.CAMERA_FOV / 2.0)
         pretty_print('CAMERA', 'Ground Width: %d cm' % self.GROUND_WIDTH)
         pretty_print('CAMERA', 'Brush Range: +/- %d cm' % self.BRUSH_RANGE)
         self.PIXEL_PER_CM = self.CAMERA_WIDTH / self.GROUND_WIDTH
@@ -72,13 +72,20 @@ class Cultivator:
         pretty_print('CAMERA', 'Pixel Range: +/- %d px' % self.PIXEL_RANGE)
         self.PIXEL_MIN = self.CAMERA_CENTER - self.PIXEL_RANGE
         self.PIXEL_MAX = self.CAMERA_CENTER + self.PIXEL_RANGE
+        
+        # Attempt to set each camera index/name
         self.cameras = []
         for i in self.CAMERAS:
-            if self.VERBOSE: pretty_print('CAMERA', 'Initializing Camera: %d' % i)
-            cam = cv2.VideoCapture(i)
-            cam.set(cv.CV_CAP_PROP_FRAME_WIDTH, self.CAMERA_WIDTH)
-            cam.set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.CAMERA_HEIGHT)
-            self.cameras.append(cam)
+            try:
+                if self.VERBOSE: pretty_print('CAMERA', 'Initializing Camera: %d' % i)
+                cam = cv2.VideoCapture(i)
+                cam.set(cv.CV_CAP_PROP_FRAME_WIDTH, self.CAMERA_WIDTH)
+                cam.set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.CAMERA_HEIGHT)
+                self.cameras.append(cam)
+                if self.VERBOSE: pretty_print('CAMERA', 'Cam #%d OK' % i)
+                time.sleep(1)
+            except Exception as error:
+                pretty_print('ERROR', str(error))
     
     # Initialize Database
     def init_db(self):
@@ -93,8 +100,10 @@ class Cultivator:
             self.collection = self.database[self.LOG_NAME]
             self.log = open('logs/' + self.LOG_NAME + '.csv', 'w')
             self.log.write(','.join(['time', 'lat', 'long', 'speed', 'cam0', 'cam1', 'estimate', 'average', 'pwm','\n']))
+            if self.VERBOSE: pretty_print('DB', 'Setup OK')
         except Exception as error:
             pretty_print('\tERROR', str(error))
+        time.sleep(1)
     
     # Initialize PID Controller
     def init_pid(self):
@@ -105,8 +114,13 @@ class Cultivator:
         if self.VERBOSE: pretty_print('PID', 'PWM Maximum: %d' % self.MAX_PWM)
         self.CENTER_PWM = int(self.MIN_PWM + self.MAX_PWM / 2.0)
         if self.VERBOSE: pretty_print('PID', 'PWM Center: %d' % self.CENTER_PWM)
-        if self.VERBOSE: pretty_print('PID', 'Default Number of Averages: %d' % self.NUM_AVERAGES)
-        self.offset_history = [self.CAMERA_CENTER] * self.NUM_AVERAGES
+        try:
+            if self.VERBOSE: pretty_print('PID', 'Default Number of Averages: %d' % self.NUM_AVERAGES)
+            self.offset_history = [self.CAMERA_CENTER] * self.NUM_AVERAGES
+            if self.VERBOSE: pretty_print('PID', 'Setup OK')
+        except Exception as error:
+            pretty_print('ERROR', str(error))
+        time.sleep(1)
     
     # Initialize Arduino
     def init_arduino(self):
@@ -115,9 +129,11 @@ class Cultivator:
             if self.VERBOSE: pretty_print('ARDUINO', 'Device: %s' % str(self.SERIAL_DEVICE))
             if self.VERBOSE: pretty_print('ARDUINO', 'Baud Rate: %s' % str(self.SERIAL_BAUD))
             self.arduino = serial.Serial(self.SERIAL_DEVICE, self.SERIAL_BAUD)
+            pretty_print('ARDUINO', 'Setup OK')
         except Exception as error:
             if self.VERBOSE: pretty_print('ERROR', str(error))
-    
+        time.sleep(1)
+        
     # Initialize GPS
     def init_gps(self):
         if self.VERBOSE: pretty_print('GPS', 'Initializing GPS')
@@ -141,8 +157,12 @@ class Cultivator:
     # Display
     def init_display(self):
         if self.VERBOSE: pretty_print('INIT', 'Initializing Display')
-        if self.DISPLAY_ON:
-            thread.start_new_thread(self.update_display, ())
+        try:
+            if self.DISPLAY_ON:
+                thread.start_new_thread(self.update_display, ())
+        except Exception as error:
+            pretty_print('ERROR', str(error))
+        time.sleep(1)
 
     ## Capture Images
     """
@@ -174,12 +194,12 @@ class Cultivator:
                 hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
                 hue_min = self.HUE_MIN # yellowish
                 hue_max = self.HUE_MAX # bluish
-                sat_min = hsv[:,:,1].mean() # cutoff for how saturated the color must be
+                sat_min = np.percentile(hsv[:,:,1], 20) # cutoff for how saturated the color must be
                 sat_max = self.SAT_MAX
-                val_min = hsv[:,:,2].mean()
+                val_min = np.percentile(hsv[:,:,2], 20)
                 val_max = self.VAL_MAX
-                threshold_min = numpy.array([hue_min, sat_min, val_min], numpy.uint8)
-                threshold_max = numpy.array([hue_max, sat_max, val_max], numpy.uint8)
+                threshold_min = np.array([hue_min, sat_min, val_min], np.uint8)
+                threshold_max = np.array([hue_max, sat_max, val_max], np.uint8)
                 mask = cv2.inRange(hsv, threshold_min, threshold_max)
                 masks.append(mask) 
             except Exception as error:
@@ -200,10 +220,10 @@ class Cultivator:
         for mask in masks:
             try:
                 column_sum = mask.sum(axis=0) # vertical summation
-                threshold = numpy.percentile(column_sum, self.THRESHOLD_PERCENTILE)
-                probable = numpy.nonzero(column_sum >= threshold) # returns 1 length tuble
+                threshold = np.percentile(column_sum, self.THRESHOLD_PERCENTILE)
+                probable = np.nonzero(column_sum >= threshold) # returns 1 length tuble
                 num_probable = len(probable[0])
-                centroid = int(numpy.median(probable[0]))
+                centroid = int(np.median(probable[0]))
                 indices.append(centroid)
             except Exception as error:
                 pretty_print('ERROR', '%s' % str(error))
@@ -219,8 +239,9 @@ class Cultivator:
     3. Estimate the weighted position of the crop row (in pixels)
     """
     def estimate_row(self, indices):
+        if self.VERBOSE: pretty_print('ROW', 'Estimating row ofset ...')
         try:
-            estimated =  int(numpy.mean(indices))
+            estimated =  int(np.mean(indices))
         except Exception as error:
             pretty_print('ERROR', str(error))
             estimated = self.CAMERA_CENTER
@@ -228,7 +249,7 @@ class Cultivator:
         self.offset_history.append(estimated)
         while len(self.offset_history) > self.NUM_AVERAGES:
             self.offset_history.pop(0)
-        average = int(numpy.mean(self.offset_history)) #!TODO
+        average = int(np.mean(self.offset_history)) #!TODO
         if self.VERBOSE: pretty_print('ROW', 'Moving Average: %s' % str(average)) 
         differential = estimated - average
         if self.VERBOSE: pretty_print('ROW', 'Differential : %s' % str(differential)) 
@@ -240,21 +261,26 @@ class Cultivator:
     2. Send PWM response over serial to controller
     """
     def control_hydraulics(self, estimate, average):
-        p = (estimate - self.CAMERA_CENTER) * self.P_COEF
-        i = (average - self.CAMERA_CENTER) * self.I_COEF
-        d = (0)  * self.D_COEF
-        if self.VERBOSE: pretty_print('PID', str([p,i,d]))
-        pwm = int(p + i + d + self.CENTER_PWM)
-        if pwm > self.MAX_PWM:
-            pwm = self.MAX_PWM
-        elif pwm < self.MIN_PWM:
-            pwm = self.MIN_PWM
+        if self.VERBOSE: pretty_print('PID', 'Calculating PID Output ...')
         try:
-            self.arduino.write(str(pwm) + '\n')
+            p = (estimate - self.CAMERA_CENTER) * self.P_COEF
+            i = (average - self.CAMERA_CENTER) * self.I_COEF
+            d = (0)  * self.D_COEF
+            if self.VERBOSE: pretty_print('PID', str([p,i,d]))
+            pwm = int(p + i + d + self.CENTER_PWM)
+            if pwm > self.MAX_PWM:
+                pwm = self.MAX_PWM
+            elif pwm < self.MIN_PWM:
+                pwm = self.MIN_PWM
+            try:
+                self.arduino.write(str(pwm) + '\n')
+            except Exception as error:
+                pretty_print('ERROR', str(error))
+            if self.VERBOSE: pretty_print('ARDUINO', 'PWM Output: %s' % str(pwm))
+            return pwm
         except Exception as error:
             pretty_print('ERROR', str(error))
-        if self.VERBOSE: pretty_print('ARDUINO', 'PWM Output: %s' % str(pwm))
-        return pwm
+            return self.CENTER_PWM
     
     ## Log to Mongo
     """
@@ -262,7 +288,7 @@ class Cultivator:
     2. Returns Doc ID
     """
     def log_db(self, sample):
-        if self.VERBOSE: pretty_print('DB', 'Logging to Database')
+        if self.VERBOSE: pretty_print('DB', 'Logging to Database ...')
         try:          
             doc_id = self.collection.insert(sample)
         except Exception as error:
@@ -311,15 +337,22 @@ class Cultivator:
                 output_images = []
                 distance = round((average - self.CAMERA_CENTER) / float(self.PIXEL_PER_CM), 1)
                 volts = round((pwm * (self.MAX_VOLTAGE - self.MIN_VOLTAGE) / (self.MAX_PWM - self.MIN_PWM) + self.MIN_VOLTAGE), 2)
-                blank = numpy.zeros((self.CAMERA_HEIGHT, self.CAMERA_WIDTH), numpy.uint8)
+                blank = np.zeros((self.CAMERA_HEIGHT, self.CAMERA_WIDTH), np.uint8)
                 for img,mask in zip(images, masks):
-                    if True: img = numpy.dstack([mask, mask, mask])
+                    (h, w, d) = img.shape
+                    if self.VERBOSE: pretty_print('DISPLAY', str(mask.shape))
+                    if self.VERBOSE: pretty_print('DISPLAY', str(img.shape))
                     cv2.line(img, (self.PIXEL_MIN, 0), (self.PIXEL_MIN, self.CAMERA_HEIGHT), (0,0,255), 1)
                     cv2.line(img, (self.PIXEL_MAX, 0), (self.PIXEL_MAX, self.CAMERA_HEIGHT), (0,0,255), 1)
                     cv2.line(img, (average, 0), (average, self.CAMERA_HEIGHT), (0,255,0), 2)
                     cv2.line(img, (self.CAMERA_CENTER, 0), (self.CAMERA_CENTER, self.CAMERA_HEIGHT), (255,255,255), 1)
-                    output_images.append(numpy.vstack([img, numpy.zeros((20, self.CAMERA_WIDTH, 3), numpy.uint8)])) #add blank space
-                output_small = numpy.hstack(output_images)
+                    img_highlight = img + 100 * np.dstack((mask, mask, mask))
+                    if self.VERBOSE: pretty_print('DISPLAY', 'Highlight Detection')
+                    bottom_pad = h / 10
+                    pad = np.zeros((bottom_pad, self.CAMERA_WIDTH, 3), np.uint8)
+                    output = np.vstack([img_highlight, pad])
+                    output_images.append(output) # add blank space
+                output_small = np.hstack(output_images)
                 output_large = cv2.resize(output_small, (1024, 768))
                 if average - self.CAMERA_CENTER >= 0:
                     distance_str = str("+%2.1f cm" % distance)
@@ -330,8 +363,9 @@ class Cultivator:
                 cv2.putText(output_large, volts_str, (840,760), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
                 cv2.namedWindow('Agri-Vision', cv2.WINDOW_NORMAL)
                 if self.FULLSCREEN: cv2.setWindowProperty('Agri-Vision', cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
+                if self.VERBOSE: pretty_print('DISPLAY', str(output_large.shape))
                 cv2.imshow('Agri-Vision', output_large)
-                if cv2.waitKey(5) == 3:
+                if cv2.waitKey(5) == 0:
                     pass
             except Exception as error:
                 pretty_print('DISPLAY', str(error))
@@ -428,5 +462,5 @@ class Cultivator:
     
 ## Main
 if __name__ == '__main__':
-    session = Cultivator(CONFIG_FILE)
+    session = AgriVision(CONFIG_FILE)
     session.run()
