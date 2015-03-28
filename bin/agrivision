@@ -1,5 +1,17 @@
 #!/bin/sh
 xset s noblank
 xset s off -dpms
-cd /root/agri-vision
-python agrivision.py fullscreen
+cd ..
+
+if [[ "$1" != "" ]]; then
+    DIR="$1"
+else
+    DIR=""
+fi
+
+if [[ "$2" != "" ]]; then
+    MODE="$2"
+else
+    MODE=""
+fi
+python agrivision.py $DIR $MODE
