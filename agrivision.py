@@ -24,7 +24,7 @@ import ast
 
 ## Constants
 try:
-    CONFIG_FILE = 'modes/%s.json' % sys.argv[1]
+    CONFIG_FILE = '%s' % sys.argv[1]
 except Exception as err:
     CONFIG_FILE = 'modes/default.json'
 
@@ -55,7 +55,9 @@ class AgriVision:
         
     # Initialize Cameras
     def init_cameras(self):
-        pretty_print('CAMERA', 'Initializing Cameras')
+        
+        # Setting variables
+        pretty_print('CAMERA', 'Initializing CV Variables')
         if self.VERBOSE:
             pretty_print('CAMERA', 'Camera Height: %d px' % self.CAMERA_HEIGHT)
             pretty_print('CAMERA', 'Camera Depth: %d cm' % self.CAMERA_DEPTH)
@@ -74,15 +76,16 @@ class AgriVision:
         self.PIXEL_MAX = self.CAMERA_CENTER + self.PIXEL_RANGE
         
         # Attempt to set each camera index/name
+        pretty_print('CAMERA', 'Initializing Cameras')
         self.cameras = []
         for i in self.CAMERAS:
             try:
-                if self.VERBOSE: pretty_print('CAMERA', 'Initializing Camera: %d' % i)
+                if self.VERBOSE: pretty_print('CAMERA', 'Attaching Camera #%d' % i)
                 cam = cv2.VideoCapture(i)
                 cam.set(cv.CV_CAP_PROP_FRAME_WIDTH, self.CAMERA_WIDTH)
                 cam.set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.CAMERA_HEIGHT)
                 self.cameras.append(cam)
-                if self.VERBOSE: pretty_print('CAMERA', 'Cam #%d OK' % i)
+                if self.VERBOSE: pretty_print('CAMERA', 'Camera #%d OK' % i)
                 time.sleep(1)
             except Exception as error:
                 pretty_print('ERROR', str(error))
@@ -120,6 +123,9 @@ class AgriVision:
             if self.VERBOSE: pretty_print('PID', 'Setup OK')
         except Exception as error:
             pretty_print('ERROR', str(error))
+        self.average = 0
+        self.estimated = 0
+        self.pwm = 0
         time.sleep(1)
     
     # Initialize Arduino
@@ -194,10 +200,10 @@ class AgriVision:
                 hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
                 hue_min = self.HUE_MIN # yellowish
                 hue_max = self.HUE_MAX # bluish
-                sat_min = np.percentile(hsv[:,:,1], 20) # cutoff for how saturated the color must be
-                sat_max = self.SAT_MAX
-                val_min = np.percentile(hsv[:,:,2], 20)
-                val_max = self.VAL_MAX
+                sat_min = np.percentile(hsv[:,:,1], self.SAT_MIN) # cutoff for how saturated the color must be
+                sat_max = np.percentile(hsv[:,:,1], self.SAT_MAX)
+                val_min = np.percentile(hsv[:,:,2], self.VAL_MIN)
+                val_max = np.percentile(hsv[:,:,2], self.VAL_MAX)
                 threshold_min = np.array([hue_min, sat_min, val_min], np.uint8)
                 threshold_max = np.array([hue_max, sat_max, val_max], np.uint8)
                 mask = cv2.inRange(hsv, threshold_min, threshold_max)
@@ -215,7 +221,7 @@ class AgriVision:
     4. Finds the median of this array of indices
     5. Repeat for each mask
     """
-    def find_indices(self, masks):
+    def find_offset(self, masks):
         indices = []
         for mask in masks:
             try:
@@ -223,7 +229,7 @@ class AgriVision:
                 threshold = np.percentile(column_sum, self.THRESHOLD_PERCENTILE)
                 probable = np.nonzero(column_sum >= threshold) # returns 1 length tuble
                 num_probable = len(probable[0])
-                centroid = int(np.median(probable[0]))
+                centroid = int(np.median(probable[0])) - self.CAMERA_CENTER
                 indices.append(centroid)
             except Exception as error:
                 pretty_print('ERROR', '%s' % str(error))
@@ -241,31 +247,32 @@ class AgriVision:
     def estimate_row(self, indices):
         if self.VERBOSE: pretty_print('ROW', 'Estimating row ofset ...')
         try:
-            estimated =  int(np.mean(indices))
+            est =  int(np.mean(indices))
         except Exception as error:
             pretty_print('ERROR', str(error))
-            estimated = self.CAMERA_CENTER
-        if self.VERBOSE: pretty_print('ROW', 'Estimated Offset: %s' % str(estimated))
-        self.offset_history.append(estimated)
+            est = self.CAMERA_CENTER
+        self.offset_history.append(est)
         while len(self.offset_history) > self.NUM_AVERAGES:
             self.offset_history.pop(0)
-        average = int(np.mean(self.offset_history)) #!TODO
-        if self.VERBOSE: pretty_print('ROW', 'Moving Average: %s' % str(average)) 
-        differential = estimated - average
-        if self.VERBOSE: pretty_print('ROW', 'Differential : %s' % str(differential)) 
-        return estimated, average, differential
+        avg = int(np.mean(self.offset_history)) #!TODO
+        diff = est - avg #!TODO can be a little more clever
+        if self.VERBOSE:
+            pretty_print('ROW', '(P) Estimated Offset: %s' % str(est))
+            pretty_print('ROW', '(I) Moving Average: %s' % str(avg))
+            pretty_print('ROW', '(D) Differential : %s' % str(diff))
+        return est, avg, diff
          
     ## Control Hydraulics
     """
     1. Get PWM response corresponding to average offset
     2. Send PWM response over serial to controller
     """
-    def control_hydraulics(self, estimate, average):
+    def calculate_output(self, estimate, average, diff):
         if self.VERBOSE: pretty_print('PID', 'Calculating PID Output ...')
         try:
-            p = (estimate - self.CAMERA_CENTER) * self.P_COEF
-            i = (average - self.CAMERA_CENTER) * self.I_COEF
-            d = (0)  * self.D_COEF
+            p = estimate * self.P_COEF
+            i = average * self.I_COEF
+            d = diff  * self.D_COEF
             if self.VERBOSE: pretty_print('PID', str([p,i,d]))
             pwm = int(p + i + d + self.CENTER_PWM)
             if pwm > self.MAX_PWM:
@@ -308,12 +315,10 @@ class AgriVision:
             latitude = str(sample['lat'])
             longitude = str(sample['long'])
             speed = str(sample['speed'])
-            cam0 = str(sample['cam0'])
-            cam1 = str(sample['cam1'])
             estimate = str(sample['estimate'])
             average = str(sample['average'])
             pwm = str(sample['pwm'])
-            self.log.write(','.join([time, latitude, longitude, speed, cam0, cam1, estimate, average, pwm,'\n']))
+            self.log.write(','.join([time, latitude, longitude, speed, estimate, average, pwm,'\n']))
         except Exception as error:
             pretty_print('ERROR', str(error))
                 
@@ -328,12 +333,10 @@ class AgriVision:
             if self.VERBOSE: pretty_print('DISPLAY', 'Displaying Images')
             try:
                 pwm = self.pwm
-                average = self.average
-                estimated = self.estimated
+                average = self.average + self.CAMERA_CENTER
+                estimated = self.estimated  + self.CAMERA_CENTER
                 masks = self.masks
                 images = self.images
-                cam0 = self.cam0
-                cam1 = self.cam1
                 output_images = []
                 distance = round((average - self.CAMERA_CENTER) / float(self.PIXEL_PER_CM), 1)
                 volts = round((pwm * (self.MAX_VOLTAGE - self.MIN_VOLTAGE) / (self.MAX_PWM - self.MIN_PWM) + self.MIN_VOLTAGE), 2)
@@ -346,7 +349,7 @@ class AgriVision:
                     cv2.line(img, (self.PIXEL_MAX, 0), (self.PIXEL_MAX, self.CAMERA_HEIGHT), (0,0,255), 1)
                     cv2.line(img, (average, 0), (average, self.CAMERA_HEIGHT), (0,255,0), 2)
                     cv2.line(img, (self.CAMERA_CENTER, 0), (self.CAMERA_CENTER, self.CAMERA_HEIGHT), (255,255,255), 1)
-                    img_highlight = img + 100 * np.dstack((mask, mask, mask))
+                    img_highlight = img + np.dstack((100* mask, 0 * mask, 0 *mask))
                     if self.VERBOSE: pretty_print('DISPLAY', 'Highlight Detection')
                     bottom_pad = h / 10
                     pad = np.zeros((bottom_pad, self.CAMERA_WIDTH, 3), np.uint8)
@@ -424,23 +427,15 @@ class AgriVision:
         while True:
             try:
                 images = self.capture_images()
-                masks = self.plant_filter(images)
-                indices = self.find_indices(masks)
-                (estimated, average, differential) = self.estimate_row(indices)
-                pwm = self.control_hydraulics(estimated, average)
-                try:
-                    cam0 = indices[0]
-                except Exception:
-                    cam0 = self.CAMERA_CENTER
-                try:
-                    cam1 = indices[1]
-                except Exception:
-                    cam1 = self.CAMERA_CENTER
+                if images: masks = self.plant_filter(images)
+                if masks: offsets = self.find_offset(masks)
+                (est, avg, diff) = self.estimate_row(offsets)
+                pwm = self.calculate_output(est, avg, diff)
                 sample = {
-                    'cam0' : cam0 - self.CAMERA_CENTER, 
-                    'cam1' : cam1 - self.CAMERA_CENTER, 
-                    'estimate' : estimated - self.CAMERA_CENTER,
-                    'average' : average - self.CAMERA_CENTER,
+                    'offsets' : offsets, 
+                    'estimated' : est,
+                    'average' : avg,
+                    'differential' : diff,
                     'pwm': pwm,
                     'time' : datetime.strftime(datetime.now(), self.TIME_FORMAT),
                     'long' : self.longitude,
@@ -450,10 +445,8 @@ class AgriVision:
                 self.pwm = pwm
                 self.images = images
                 self.masks = masks
-                self.average = average
-                self.estimated = estimated
-                self.cam0 = cam0
-                self.cam1 = cam1
+                self.average = avg
+                self.estimated = est
                 if self.MONGO_ON: doc_id = self.log_db(sample)
                 if self.LOGFILE_ON: self.log_file(sample)
             except KeyboardInterrupt as error:

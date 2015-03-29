@@ -10,4 +10,3 @@ Multi-camera computer-vision guidance system for row-crop cultivators
 To install the system, simply run the install script:
     
     sh install.sh
-    
