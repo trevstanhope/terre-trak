@@ -228,6 +228,12 @@ class AgriVision:
                 column_sum = mask.sum(axis=0) # vertical summation
                 threshold = np.percentile(column_sum, self.THRESHOLD_PERCENTILE)
                 probable = np.nonzero(column_sum >= threshold) # returns 1 length tuble
+                if self.VERBOSE:
+                    fig = plt.figure()
+                    plt.plot(range(self.CAMERA_WIDTH), column_sum)
+                    plt.show()
+                    time.sleep(0.1)
+                    plt.close(fig)
                 num_probable = len(probable[0])
                 centroid = int(np.median(probable[0])) - self.CAMERA_CENTER
                 indices.append(centroid)
