@@ -1,4 +1,5 @@
 {
+    "DEBUG" : false,
     "FULLSCREEN" : false,
     "CAMERAS" : [0],
     "FREQUENCY_LIMIT" : 50,
@@ -24,11 +25,12 @@
     "LOG_FORMAT" : "%Y_%m_%d_%H_%M_%S",
     "LOGFILE_ON" : false,
     "MONGO_ON" : false,
-    "DISPLAY_ON" : false,
+    "DISPLAY_ON" : true,
     "GPS_ENABLED" : false,
     "VERBOSE" : true,
     "MIN_VOLTAGE": 0.10,
     "MAX_VOLTAGE": 8.00,
     "SUPPLY_VOLTAGE": 9.69,
-    "BRUSH_RANGE" : 6
+    "BRUSH_RANGE" : 6,
+    "HIGHLIGHT" : true
 }

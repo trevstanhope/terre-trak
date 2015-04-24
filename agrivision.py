@@ -86,7 +86,6 @@ class AgriVision:
                 cam.set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.CAMERA_HEIGHT)
                 self.cameras.append(cam)
                 if self.VERBOSE: pretty_print('CAMERA', 'Camera #%d OK' % i)
-                time.sleep(1)
             except Exception as error:
                 pretty_print('ERROR', str(error))
     
@@ -106,7 +105,6 @@ class AgriVision:
             if self.VERBOSE: pretty_print('DB', 'Setup OK')
         except Exception as error:
             pretty_print('\tERROR', str(error))
-        time.sleep(1)
     
     # Initialize PID Controller
     def init_pid(self):
@@ -126,7 +124,6 @@ class AgriVision:
         self.average = 0
         self.estimated = 0
         self.pwm = 0
-        time.sleep(1)
     
     # Initialize Arduino
     def init_arduino(self):
@@ -138,7 +135,6 @@ class AgriVision:
             pretty_print('ARDUINO', 'Setup OK')
         except Exception as error:
             if self.VERBOSE: pretty_print('ERROR', str(error))
-        time.sleep(1)
         
     # Initialize GPS
     def init_gps(self):
@@ -228,7 +224,7 @@ class AgriVision:
                 column_sum = mask.sum(axis=0) # vertical summation
                 threshold = np.percentile(column_sum, self.THRESHOLD_PERCENTILE)
                 probable = np.nonzero(column_sum >= threshold) # returns 1 length tuble
-                if self.VERBOSE:
+                if self.DEBUG:
                     fig = plt.figure()
                     plt.plot(range(self.CAMERA_WIDTH), column_sum)
                     plt.show()
@@ -355,7 +351,7 @@ class AgriVision:
                     cv2.line(img, (self.PIXEL_MAX, 0), (self.PIXEL_MAX, self.CAMERA_HEIGHT), (0,0,255), 1)
                     cv2.line(img, (average, 0), (average, self.CAMERA_HEIGHT), (0,255,0), 2)
                     cv2.line(img, (self.CAMERA_CENTER, 0), (self.CAMERA_CENTER, self.CAMERA_HEIGHT), (255,255,255), 1)
-                    img_highlight = img + np.dstack((100* mask, 0 * mask, 0 *mask))
+                    if self.HIGHLIGHT: img_highlight = img + np.dstack((100 * mask, 0 * mask, 0 *mask))
                     if self.VERBOSE: pretty_print('DISPLAY', 'Highlight Detection')
                     bottom_pad = h / 10
                     pad = np.zeros((bottom_pad, self.CAMERA_WIDTH, 3), np.uint8)
