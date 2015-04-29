@@ -332,6 +332,7 @@ class AgriVision:
     """
     def update_display(self):
         while True:
+            time.sleep(0.1)
             if self.VERBOSE: pretty_print('DISPLAY', 'Displaying Images')
             try:
                 pwm = self.pwm
@@ -344,19 +345,22 @@ class AgriVision:
                 volts = round((pwm * (self.MAX_VOLTAGE - self.MIN_VOLTAGE) / (self.MAX_PWM - self.MIN_PWM) + self.MIN_VOLTAGE), 2)
                 blank = np.zeros((self.CAMERA_HEIGHT, self.CAMERA_WIDTH), np.uint8)
                 for img,mask in zip(images, masks):
-                    (h, w, d) = img.shape
-                    if self.VERBOSE: pretty_print('DISPLAY', str(mask.shape))
-                    if self.VERBOSE: pretty_print('DISPLAY', str(img.shape))
-                    cv2.line(img, (self.PIXEL_MIN, 0), (self.PIXEL_MIN, self.CAMERA_HEIGHT), (0,0,255), 1)
-                    cv2.line(img, (self.PIXEL_MAX, 0), (self.PIXEL_MAX, self.CAMERA_HEIGHT), (0,0,255), 1)
-                    cv2.line(img, (average, 0), (average, self.CAMERA_HEIGHT), (0,255,0), 2)
-                    cv2.line(img, (self.CAMERA_CENTER, 0), (self.CAMERA_CENTER, self.CAMERA_HEIGHT), (255,255,255), 1)
-                    if self.HIGHLIGHT: img_highlight = img + np.dstack((100 * mask, 0 * mask, 0 *mask))
-                    if self.VERBOSE: pretty_print('DISPLAY', 'Highlight Detection')
-                    bottom_pad = h / 10
-                    pad = np.zeros((bottom_pad, self.CAMERA_WIDTH, 3), np.uint8)
-                    output = np.vstack([img_highlight, pad])
-                    output_images.append(output) # add blank space
+                    try:
+                        (h, w, d) = img.shape
+                        if self.VERBOSE: pretty_print('DISPLAY', str(mask.shape))
+                        if self.VERBOSE: pretty_print('DISPLAY', str(img.shape))
+                        cv2.line(img, (self.PIXEL_MIN, 0), (self.PIXEL_MIN, self.CAMERA_HEIGHT), (0,0,255), 1)
+                        cv2.line(img, (self.PIXEL_MAX, 0), (self.PIXEL_MAX, self.CAMERA_HEIGHT), (0,0,255), 1)
+                        cv2.line(img, (average, 0), (average, self.CAMERA_HEIGHT), (0,255,0), 2)
+                        cv2.line(img, (self.CAMERA_CENTER, 0), (self.CAMERA_CENTER, self.CAMERA_HEIGHT), (255,255,255), 1)
+                        if self.HIGHLIGHT: img_highlight = img + np.dstack((100 * mask, 0 * mask, 0 *mask))
+                        if self.VERBOSE: pretty_print('DISPLAY', 'Highlight Detection')
+                        bottom_pad = h / 10
+                        pad = np.zeros((bottom_pad, self.CAMERA_WIDTH, 3), np.uint8)
+                        output = np.vstack([img_highlight, pad])
+                        output_images.append(output) # add blank space
+                    except Exception as error:
+                        pretty_print('DISPLAY', str(error))
                 output_small = np.hstack(output_images)
                 output_large = cv2.resize(output_small, (1024, 768))
                 if average - self.CAMERA_CENTER >= 0:
@@ -431,7 +435,7 @@ class AgriVision:
                 images = self.capture_images()
                 if images: masks = self.plant_filter(images)
                 if masks: offsets = self.find_offset(masks)
-                (est, avg, diff) = self.estimate_row(offsets)
+                if offsets: (est, avg, diff) = self.estimate_row(offsets)
                 pwm = self.calculate_output(est, avg, diff)
                 sample = {
                     'offsets' : offsets, 
@@ -454,6 +458,8 @@ class AgriVision:
             except KeyboardInterrupt as error:
                 self.close()    
                 break
+            except UnboundLocalError as error:
+                pass
     
 ## Main
 if __name__ == '__main__':
