@@ -46,6 +46,7 @@ class AgriVision:
                 setattr(self, key, self.config[key])
         
         # Initializers
+        self.init_log() # it's best to run the log first to catch all events
         self.init_cameras()
         self.init_arduino()
         self.init_pid()
@@ -100,8 +101,6 @@ class AgriVision:
             self.client = MongoClient()
             self.database = self.client[self.MONGO_NAME]
             self.collection = self.database[self.LOG_NAME]
-            self.log = open('logs/' + self.LOG_NAME + '.csv', 'w')
-            self.log.write(','.join(['time', 'lat', 'long', 'speed', 'cam0', 'cam1', 'estimate', 'average', 'pwm','\n']))
             if self.VERBOSE: pretty_print('DB', 'Setup OK')
         except Exception as error:
             pretty_print('\tERROR', str(error))
@@ -125,6 +124,18 @@ class AgriVision:
         self.estimated = 0
         self.pwm = 0
     
+    # Initialize Log
+    def init_log(self):
+        if self.VERBOSE: pretty_print('LOG', 'Initializing Log')
+        self.LOG_NAME = datetime.strftime(datetime.now(), self.LOG_FORMAT)
+        if self.VERBOSE: pretty_print('LOG', 'New log file: %s' % self.LOG_NAME)
+        try:
+            self.log = open('logs/' + self.LOG_NAME + '.csv', 'w')
+            self.log.write(','.join(['time', 'lat', 'long', 'speed', 'cam0', 'cam1', 'estimate', 'average', 'pwm','\n']))
+            if self.VERBOSE: pretty_print('LOG', 'Setup OK')
+        except Exception as error:
+            pretty_print('\tERROR', str(error))
+            
     # Initialize Arduino
     def init_arduino(self):
         if self.VERBOSE: pretty_print('ARDUINO', 'Initializing Arduino')
