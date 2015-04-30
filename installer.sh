@@ -49,6 +49,7 @@ apt-get install libvorbis-dev -y
 apt-get install libxvidcore-dev -y
 apt-get install x264 -y
 apt-get install v4l-utils -y
+apt-get install arduino arduino-mk
 
 # OpenCV Dependency Fix
 echo "Fix for AVformat"
