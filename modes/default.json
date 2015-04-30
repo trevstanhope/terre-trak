@@ -1,8 +1,9 @@
 {
     "DEBUG" : false,
-    "CAMERA_ROTATION" : 90,
     "PWM_MIN" : 0,
     "PWM_MAX" : 255,
+    "DISPLAY_WIDTH" : 1024,
+    "DISPLAY_HEIGHT" : 768,
     "FULLSCREEN" : false,
     "CAMERAS" : 1,
     "FREQUENCY_LIMIT" : 50,

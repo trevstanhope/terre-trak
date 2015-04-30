@@ -407,17 +407,17 @@ class AgriVision:
                         pretty_print('DISP', 'ERROR: %s' % str(error))
                 if self.VERBOSE: pretty_print('DISP', 'Stacking images ...')
                 output_small = np.hstack(output_images)
-                pad = np.zeros((self.CAMERA_HEIGHT / 10, self.CAMERAS * self.CAMERA_WIDTH, 3), np.uint8) # add blank space
+                pad = np.zeros((self.CAMERA_HEIGHT * 0.1, self.CAMERAS * self.CAMERA_WIDTH, 3), np.uint8) # add blank space
                 output_padded = np.vstack([output_small, pad])
                 if self.VERBOSE: pretty_print('DISP', 'Padded image')
-                output_large = cv2.resize(output_padded, (1024, 768))
+                output_large = cv2.resize(output_padded, (self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT))
                 if average - self.CAMERA_CENTER >= 0:
                     distance_str = str("+%2.1f cm" % distance)
                 elif average - self.CAMERA_CENTER< 0:
                     distance_str = str("%2.1f cm" % distance)
                 volts_str = str("%2.1f V" % volts)
-                cv2.putText(output_large, distance_str, (int(1024 * 0.33), int(1024 * 0.74)), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
-                cv2.putText(output_large, volts_str, (int(1024 * 0.82), int(1024 * 0.74)), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
+                cv2.putText(output_large, distance_str, (int(self.DISPLAY_WIDTH * 0.33), int(self.DISPLAY_WIDTH * 0.74)), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
+                cv2.putText(output_large, volts_str, (int(self.DISPLAY_WIDTH * 0.82), int(self.DISPLAY_WIDTH * 0.74)), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
                 cv2.namedWindow('Agri-Vision', cv2.WINDOW_NORMAL)
                 if self.FULLSCREEN: cv2.setWindowProperty('Agri-Vision', cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
                 if self.VERBOSE: pretty_print('DISP', 'Output shape: %s' % str(output_large.shape))

@@ -4,7 +4,7 @@
     "PWM_MAX" : 255,
     "DISPLAY_WIDTH" : 1024,
     "DISPLAY_HEIGHT" : 768,
-    "FULLSCREEN" : false,
+    "FULLSCREEN" : true,
     "CAMERAS" : 2,
     "FREQUENCY_LIMIT" : 50,
     "CAMERA_WIDTH" : 240,
@@ -33,9 +33,9 @@
     "DISPLAY_ON" : true,
     "GPS_ENABLED" : false,
     "VERBOSE" : true,
-    "MIN_VOLTAGE": 0.10,
-    "MAX_VOLTAGE": 8.00,
-    "SUPPLY_VOLTAGE": 9.69,
+    "MIN_VOLTAGE": 0.00,
+    "MAX_VOLTAGE": 2.50,
+    "SUPPLY_VOLTAGE": 5.0,
     "BRUSH_RANGE" : 6,
     "HIGHLIGHT" : true
 }
