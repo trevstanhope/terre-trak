@@ -376,7 +376,7 @@ class AgriVision:
                 output_images = []
                 distance = round((average - self.CAMERA_CENTER) / float(self.PIXEL_PER_CM), 1)
                 volts = round((pwm * (self.MAX_VOLTAGE - self.MIN_VOLTAGE) / (self.PWM_MAX - self.PWM_MIN) + self.MIN_VOLTAGE), 2)
-                for i in xrange(len(self.CAMERAS)):
+                for i in xrange(self.CAMERAS):
                     try:
                         if self.VERBOSE: pretty_print('DISP', 'Image #%d' % (i+1))
                         img = images[i]
