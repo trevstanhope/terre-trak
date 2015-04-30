@@ -397,7 +397,7 @@ class AgriVision:
                         pretty_print('DISP', 'ERROR: %s' % str(error))
                 if self.VERBOSE: pretty_print('DISP', 'Stacking images ...')
                 output_small = np.hstack(output_images)
-                pad = np.zeros((self.CAMERA_HEIGHT / 10, len(self.CAMERAS) * self.CAMERA_WIDTH, 3), np.uint8) # add blank space
+                pad = np.zeros((self.CAMERA_HEIGHT / 10, self.CAMERAS * self.CAMERA_WIDTH, 3), np.uint8) # add blank space
                 output_padded = np.vstack([output_small, pad])
                 if self.VERBOSE: pretty_print('DISP', 'Padded image')
                 output_large = cv2.resize(output_padded, (1024, 768))
