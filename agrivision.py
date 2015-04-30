@@ -81,7 +81,7 @@ class AgriVision:
         # Attempt to set each camera index/name
         pretty_print('CAM', 'Initializing Cameras')
         self.cameras = []
-        for i in self.CAMERAS:
+        for i in range(self.CAMERAS):
             try:
                 if self.VERBOSE: pretty_print('CAM', 'Attaching Camera #%d' % i)
                 cam = cv2.VideoCapture(i)
@@ -138,7 +138,7 @@ class AgriVision:
             
     # Initialize Controller
     def init_controller(self):
-        if self.VERBOSE: pretty_print('', 'Initializing controller ...')
+        if self.VERBOSE: pretty_print('CTRL', 'Initializing controller ...')
         try:
             if self.VERBOSE: pretty_print('CTRL', 'Device: %s' % str(self.SERIAL_DEVICE))
             if self.VERBOSE: pretty_print('CTRL', 'Baud Rate: %s' % str(self.SERIAL_BAUD))

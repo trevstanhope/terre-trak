@@ -3,7 +3,7 @@
     "PWM_MIN" : 0,
     "PWM_MAX" : 255,
     "FULLSCREEN" : true,
-    "CAMERAS" : [0],
+    "CAMERAS" : 1,
     "FREQUENCY_LIMIT" : 50,
     "CAMERA_WIDTH" : 640,
     "CAMERA_HEIGHT" : 480,
