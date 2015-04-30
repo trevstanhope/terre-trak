@@ -411,13 +411,39 @@ class AgriVision:
                 output_padded = np.vstack([output_small, pad])
                 if self.VERBOSE: pretty_print('DISP', 'Padded image')
                 output_large = cv2.resize(output_padded, (self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT))
+
+                # Offset Distance
                 if average - self.CAMERA_CENTER >= 0:
                     distance_str = str("+%2.1f cm" % distance)
                 elif average - self.CAMERA_CENTER< 0:
                     distance_str = str("%2.1f cm" % distance)
+                cv2.putText(output_large, distance_str, (int(self.DISPLAY_WIDTH * 0.01), int(self.DISPLAY_WIDTH * 0.74)), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
+                
+                # Output Voltage
                 volts_str = str("%2.1f V" % volts)
-                cv2.putText(output_large, distance_str, (int(self.DISPLAY_WIDTH * 0.33), int(self.DISPLAY_WIDTH * 0.74)), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
                 cv2.putText(output_large, volts_str, (int(self.DISPLAY_WIDTH * 0.82), int(self.DISPLAY_WIDTH * 0.74)), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
+                
+                # Arrow
+                if average - self.CAMERA_CENTER >= 0:
+                    p = (int(self.DISPLAY_WIDTH * 0.45), int(self.DISPLAY_WIDTH * 0.72))
+                    q = (int(self.DISPLAY_WIDTH * 0.55), int(self.DISPLAY_WIDTH * 0.72))
+                elif average - self.CAMERA_CENTER< 0:
+                    p = (int(self.DISPLAY_WIDTH * 0.55), int(self.DISPLAY_WIDTH * 0.72))
+                    q = (int(self.DISPLAY_WIDTH * 0.45), int(self.DISPLAY_WIDTH * 0.72))
+                color = (255,255,255)
+                thickness = 8
+                line_type = 8
+                shift = 0
+                arrow_magnitude=20
+                cv2.line(output_large, p, q, color, thickness, line_type, shift) # draw arrow tail
+                angle = np.arctan2(p[1]-q[1], p[0]-q[0])
+                p = (int(q[0] + arrow_magnitude * np.cos(angle + np.pi/4)), # starting point of first line of arrow head 
+                int(q[1] + arrow_magnitude * np.sin(angle + np.pi/4)))
+                cv2.line(output_large, p, q, color, thickness, line_type, shift) # draw first half of arrow head
+                p = (int(q[0] + arrow_magnitude * np.cos(angle - np.pi/4)), # starting point of second line of arrow head 
+                int(q[1] + arrow_magnitude * np.sin(angle - np.pi/4)))
+                cv2.line(output_large, p, q, color, thickness, line_type, shift) # draw second half of arrow head
+
                 cv2.namedWindow('Agri-Vision', cv2.WINDOW_NORMAL)
                 if self.FULLSCREEN: cv2.setWindowProperty('Agri-Vision', cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
                 if self.VERBOSE: pretty_print('DISP', 'Output shape: %s' % str(output_large.shape))
@@ -515,7 +541,7 @@ class AgriVision:
                 break
             except UnboundLocalError as error:
                 pass
-    
+
 ## Main
 if __name__ == '__main__':
     session = AgriVision(CONFIG_FILE)
