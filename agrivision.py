@@ -50,11 +50,11 @@ class AgriVision:
         # Initializers
         self.init_log() # it's best to run the log first to catch all events
         self.init_cameras()
-        self.init_arduino()
+        self.init_controller()
         self.init_pid()
         self.init_db()
         self.init_gps()
-        #self.init_display()
+        if self.DISPLAY_ON: self.init_display()
         
     # Initialize Cameras
     def init_cameras(self):
@@ -136,33 +136,27 @@ class AgriVision:
         except Exception as error:
             pretty_print('ERROR', str(error))
             
-    # Initialize Arduino
-    def init_arduino(self):
-        if self.VERBOSE: pretty_print('ARDUINO', 'Initializing Arduino')
+    # Initialize Controller
+    def init_controller(self):
+        if self.VERBOSE: pretty_print('', 'Initializing controller ...')
         try:
-            if self.VERBOSE: pretty_print('ARDUINO', 'Device: %s' % str(self.SERIAL_DEVICE))
-            if self.VERBOSE: pretty_print('ARDUINO', 'Baud Rate: %s' % str(self.SERIAL_BAUD))
-            self.arduino = serial.Serial(self.SERIAL_DEVICE, self.SERIAL_BAUD)
-            pretty_print('ARDUINO', 'Setup OK')
+            if self.VERBOSE: pretty_print('CTRL', 'Device: %s' % str(self.SERIAL_DEVICE))
+            if self.VERBOSE: pretty_print('CTRL', 'Baud Rate: %s' % str(self.SERIAL_BAUD))
+            self.controller = serial.Serial(self.SERIAL_DEVICE, self.SERIAL_BAUD)
+            pretty_print('CTRL', 'Setup OK')
         except Exception as error:
-            pretty_print('ARDUINO', 'ERROR: %s' % str(error))
+            pretty_print('CTRL', 'ERROR: %s' % str(error))
         
     # Initialize GPS
     def init_gps(self):
-        if self.VERBOSE: pretty_print('GPS', 'Initializing GPS')
-        if self.GPS_ENABLED:
-            try:
-                if self.VERBOSE: pretty_print('GPS', 'WARNING: Enabing GPS')
-                self.gpsd = gps.gps()
-                self.gpsd.stream(gps.WATCH_ENABLE)
-                thread.start_new_thread(self.update_gps, ())
-            except Exception as err:
-                pretty_print('GPS', 'GPS not available! %s' % str(err))
-                self.latitude = 0
-                self.longitude = 0
-                self.speed = 0
-        else:
-            pretty_print('GPS', 'WARNING: GPS Disabled')
+        if self.VERBOSE: pretty_print('GPS', 'Initializing GPS ...')
+        try:
+            if self.VERBOSE: pretty_print('GPS', 'Enabing GPS ...')
+            self.gpsd = gps.gps()
+            self.gpsd.stream(gps.WATCH_ENABLE)
+            thread.start_new_thread(self.update_gps, ())
+        except Exception as err:
+            pretty_print('GPS', 'WARNING: GPS not available! %s' % str(err))
             self.latitude = 0
             self.longitude = 0
             self.speed = 0
@@ -171,6 +165,7 @@ class AgriVision:
     def init_display(self):
         if self.VERBOSE: pretty_print('INIT', 'Initializing Display')
         try:
+            self.updating = False
             if self.DISPLAY_ON:
                 thread.start_new_thread(self.update_display, ())
         except Exception as error:
@@ -316,8 +311,8 @@ class AgriVision:
         if self.VERBOSE: pretty_print('CTRL', 'Setting controller state ...')
         try:            
             try:
-                assert self.arduino is not None
-                self.arduino.write(str(pwm) + '\n') # Write to PWM adaptor
+                assert self.controller is not None
+                self.controller.write(str(pwm) + '\n') # Write to PWM adaptor
                 if self.VERBOSE: pretty_print('CTRL', 'Wrote successfully')
             except Exception as error:
                 pretty_print('CTRL', 'ERROR: %s' % str(error))
@@ -362,11 +357,15 @@ class AgriVision:
     ## Displays 
     """
     1. Draw lines on RGB images
-    2. Draw lines on EGI images (the masks)
+    2. Draw lines on ABP masks
     3. Output GUI display
     """
     def update_display(self):
-        if True:
+        if self.updating:
+            time.sleep(1 / 30) # delay by frames per second
+            return # if the display is already updating, wait and exit (puts less harm on the CPU)
+        else:
+            self.updating = True
             if self.VERBOSE: pretty_print('DISP', 'Displaying Images ...')
             try:
                 pwm = self.pwm
@@ -391,25 +390,24 @@ class AgriVision:
                         cv2.line(img, (self.PIXEL_MAX, 0), (self.PIXEL_MAX, self.CAMERA_HEIGHT), (0,0,255), 1)
                         cv2.line(img, (average, 0), (average, self.CAMERA_HEIGHT), (0,255,0), 2)
                         cv2.line(img, (self.CAMERA_CENTER, 0), (self.CAMERA_CENTER, self.CAMERA_HEIGHT), (255,255,255), 1)
-                        if self.HIGHLIGHT: img_highlight = img + np.dstack((100 * mask, 0 * mask, 0 *mask))
+                        if self.HIGHLIGHT: img_highlight = img + np.dstack((100 * mask, 100 * mask, 0 *mask))
                         if self.VERBOSE: pretty_print('DISP', 'Highlighted detected plants')
-                        bottom_pad = h / 10
-                        pad = np.zeros((bottom_pad, self.CAMERA_WIDTH, 3), np.uint8) # add blank space
-                        output = np.vstack([img_highlight, pad])
-                        if self.VERBOSE: pretty_print('DISP', 'Padded image')
-                        output_images.append(output)
+                        output_images.append(img_highlight)
                     except Exception as error:
                         pretty_print('DISP', 'ERROR: %s' % str(error))
                 if self.VERBOSE: pretty_print('DISP', 'Stacking images ...')
                 output_small = np.hstack(output_images)
-                output_large = cv2.resize(output_small, (1024, 768))
+                pad = np.zeros((self.CAMERA_HEIGHT / 10, len(self.CAMERAS) * self.CAMERA_WIDTH, 3), np.uint8) # add blank space
+                output_padded = np.vstack([output_small, pad])
+                if self.VERBOSE: pretty_print('DISP', 'Padded image')
+                output_large = cv2.resize(output_padded, (1024, 768))
                 if average - self.CAMERA_CENTER >= 0:
                     distance_str = str("+%2.1f cm" % distance)
                 elif average - self.CAMERA_CENTER< 0:
                     distance_str = str("%2.1f cm" % distance)
                 volts_str = str("%2.1f V" % volts)
-                cv2.putText(output_large, distance_str, (340,760), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
-                cv2.putText(output_large, volts_str, (840,760), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
+                cv2.putText(output_large, distance_str, (int(1024 * 0.33), int(1024 * 0.74)), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
+                cv2.putText(output_large, volts_str, (int(1024 * 0.82), int(1024 * 0.74)), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
                 cv2.namedWindow('Agri-Vision', cv2.WINDOW_NORMAL)
                 if self.FULLSCREEN: cv2.setWindowProperty('Agri-Vision', cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
                 if self.VERBOSE: pretty_print('DISP', 'Output shape: %s' % str(output_large.shape))
@@ -418,6 +416,7 @@ class AgriVision:
                     pass
             except Exception as error:
                 pretty_print('DISP', str(error))
+            self.updating = False
                     
     ## Update GPS
     """
@@ -426,6 +425,7 @@ class AgriVision:
     """
     def update_gps(self):  
         while True:
+            time.sleep(1) # GPS update time
             self.gpsd.next()
             self.latitude = self.gpsd.fix.latitude
             self.longitude = self.gpsd.fix.longitude
@@ -436,18 +436,18 @@ class AgriVision:
     """
     Function to shutdown application safely
     1. Close windows
-    2. Disable arduino
+    2. Disable controller
     3. Release capture interfaces 
     """
     def close(self):
         if self.VERBOSE: pretty_print('SYSTEM', 'Shutting Down ...')
         time.sleep(1)
         try:
-            if self.VERBOSE: pretty_print('ARDUINO', 'Closing Arduino ...')
-            self.arduino.close() ## Disable arduino
+            if self.VERBOSE: pretty_print('CTRL', 'Closing Controller ...')
+            self.controller.close() ## Disable controller
             time.sleep(0.5)
         except Exception as error:
-            pretty_print('ARDUINO', 'ERROR: %s' % str(error))
+            pretty_print('CTRL', 'ERROR: %s' % str(error))
         for i in range(len(self.cameras)):
             try:
                 if self.VERBOSE: pretty_print('CAM', 'Closing Camera #%d ...' % i)
@@ -467,7 +467,7 @@ class AgriVision:
     5. Estimate row from both images
     6. Get number of averages
     7. Calculate moving average
-    8. Send PWM response to arduino
+    8. Send PWM response to controller
     9. Throttle to desired frequency
     10. Log results to DB
     11. Display results
