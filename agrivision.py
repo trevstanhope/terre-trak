@@ -190,7 +190,10 @@ class AgriVision:
             (s, bgr) = cam.read() 
             if s:
                 images.append(bgr)
-        if self.VERBOSE: pretty_print('CAMERA', 'Images captured: %d' % len(images))
+                if self.VERBOSE: pretty_print('CAMERA', 'Capture successful')
+            else:
+                images.append(None)
+                if self.VERBOSE: pretty_print('CAMERA', 'Capture failed')
         return images
         
     ## Plant Segmentation Filter
@@ -203,20 +206,23 @@ class AgriVision:
     def plant_filter(self, images):
         masks = []
         for bgr in images:
-            try:
-                hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
-                hue_min = self.HUE_MIN # yellowish
-                hue_max = self.HUE_MAX # bluish
-                sat_min = np.percentile(hsv[:,:,1], self.SAT_MIN) # cutoff for how saturated the color must be
-                sat_max = np.percentile(hsv[:,:,1], self.SAT_MAX)
-                val_min = np.percentile(hsv[:,:,2], self.VAL_MIN)
-                val_max = np.percentile(hsv[:,:,2], self.VAL_MAX)
-                threshold_min = np.array([hue_min, sat_min, val_min], np.uint8)
-                threshold_max = np.array([hue_max, sat_max, val_max], np.uint8)
-                mask = cv2.inRange(hsv, threshold_min, threshold_max)
-                masks.append(mask) 
-            except Exception as error:
-                pretty_print('CV', str(error))        
+            if bgr is not None:
+                try:
+                    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+                    hue_min = self.HUE_MIN # yellowish
+                    hue_max = self.HUE_MAX # bluish
+                    sat_min = np.percentile(hsv[:,:,1], self.SAT_MIN) # cutoff for how saturated the color must be
+                    sat_max = np.percentile(hsv[:,:,1], self.SAT_MAX)
+                    val_min = np.percentile(hsv[:,:,2], self.VAL_MIN)
+                    val_max = np.percentile(hsv[:,:,2], self.VAL_MAX)
+                    threshold_min = np.array([hue_min, sat_min, val_min], np.uint8)
+                    threshold_max = np.array([hue_max, sat_max, val_max], np.uint8)
+                    mask = cv2.inRange(hsv, threshold_min, threshold_max)
+                    masks.append(mask) 
+                except Exception as error:
+                    pretty_print('CV', str(error))
+            else:
+                masks.append(None)
         if self.VERBOSE: pretty_print('CV', 'Number of Masks: %d mask(s) ' % len(masks))
         return masks
         
@@ -231,21 +237,22 @@ class AgriVision:
     def find_offset(self, masks):
         indices = []
         for mask in masks:
-            try:
-                column_sum = mask.sum(axis=0) # vertical summation
-                threshold = np.percentile(column_sum, self.THRESHOLD_PERCENTILE)
-                probable = np.nonzero(column_sum >= threshold) # returns 1 length tuble
-                if self.DEBUG:
-                    fig = plt.figure()
-                    plt.plot(range(self.CAMERA_WIDTH), column_sum)
-                    plt.show()
-                    time.sleep(0.1)
-                    plt.close(fig)
-                num_probable = len(probable[0])
-                centroid = int(np.median(probable[0])) - self.CAMERA_CENTER
-                indices.append(centroid)
-            except Exception as error:
-                pretty_print('ERROR', '%s' % str(error))
+            if mask is not None:
+                try:
+                    column_sum = mask.sum(axis=0) # vertical summation
+                    threshold = np.percentile(column_sum, self.THRESHOLD_PERCENTILE)
+                    probable = np.nonzero(column_sum >= threshold) # returns 1 length tuble
+                    if self.DEBUG:
+                        fig = plt.figure()
+                        plt.plot(range(self.CAMERA_WIDTH), column_sum)
+                        plt.show()
+                        time.sleep(0.1)
+                        plt.close(fig)
+                    num_probable = len(probable[0])
+                    centroid = int(np.median(probable[0])) - self.CAMERA_CENTER
+                    indices.append(centroid)
+                except Exception as error:
+                    pretty_print('ERROR', '%s' % str(error))
         if self.VERBOSE: pretty_print('CV', 'Detected Indices : %s' % str(indices))
         return indices
         
@@ -354,9 +361,14 @@ class AgriVision:
                 output_images = []
                 distance = round((average - self.CAMERA_CENTER) / float(self.PIXEL_PER_CM), 1)
                 volts = round((pwm * (self.MAX_VOLTAGE - self.MIN_VOLTAGE) / (self.MAX_PWM - self.MIN_PWM) + self.MIN_VOLTAGE), 2)
-                blank = np.zeros((self.CAMERA_HEIGHT, self.CAMERA_WIDTH), np.uint8)
-                for img,mask in zip(images, masks):
+                for i in range(len(self.CAMERAS)):
                     try:
+                        if self.VERBOSE: pretty_print('DISPLAY', 'Image #%d' % (i+1))
+                        img = images[i]
+                        mask = masks[i]
+                        print img, mask
+                        if img is None: img = np.zeros((self.CAMERA_HEIGHT, self.CAMERA_WIDTH, 3), np.uint8)
+                        if mask is None: mask = np.zeros((self.CAMERA_HEIGHT, self.CAMERA_WIDTH), np.uint8)
                         (h, w, d) = img.shape
                         if self.VERBOSE: pretty_print('DISPLAY', str(mask.shape))
                         if self.VERBOSE: pretty_print('DISPLAY', str(img.shape))
@@ -367,11 +379,13 @@ class AgriVision:
                         if self.HIGHLIGHT: img_highlight = img + np.dstack((100 * mask, 0 * mask, 0 *mask))
                         if self.VERBOSE: pretty_print('DISPLAY', 'Highlight Detection')
                         bottom_pad = h / 10
-                        pad = np.zeros((bottom_pad, self.CAMERA_WIDTH, 3), np.uint8)
+                        pad = np.zeros((bottom_pad, self.CAMERA_WIDTH, 3), np.uint8) # add blank space
                         output = np.vstack([img_highlight, pad])
-                        output_images.append(output) # add blank space
+                        if self.VERBOSE: pretty_print('DISPLAY', 'Padded Image')
+                        output_images.append(output)
                     except Exception as error:
                         pretty_print('DISPLAY', str(error))
+                if self.VERBOSE: pretty_print('DISPLAY', 'Stacking images')
                 output_small = np.hstack(output_images)
                 output_large = cv2.resize(output_small, (1024, 768))
                 if average - self.CAMERA_CENTER >= 0:
@@ -444,9 +458,9 @@ class AgriVision:
         while True:
             try:
                 images = self.capture_images()
-                if images: masks = self.plant_filter(images)
-                if masks: offsets = self.find_offset(masks)
-                if offsets: (est, avg, diff) = self.estimate_row(offsets)
+                masks = self.plant_filter(images)
+                offsets = self.find_offset(masks)
+                (est, avg, diff) = self.estimate_row(offsets)
                 pwm = self.calculate_output(est, avg, diff)
                 sample = {
                     'offsets' : offsets, 
