@@ -19,7 +19,7 @@
     "VAL_MIN" : 20,
     "VAL_MAX" : 99,
     "THRESHOLD_PERCENTILE": 95,
-    "NUM_AVERAGES": 100,
+    "NUM_AVERAGES": 20,
     "P_COEF" : 1.0,
     "I_COEF" : 0.5,
     "D_COEF" : 0.01,
