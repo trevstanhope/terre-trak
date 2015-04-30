@@ -399,9 +399,9 @@ class AgriVision:
                         cv2.line(img, (self.PIXEL_MAX, 0), (self.PIXEL_MAX, self.CAMERA_HEIGHT), (0,0,255), 1)
                         cv2.line(img, (average, 0), (average, self.CAMERA_HEIGHT), (0,255,0), 2)
                         cv2.line(img, (self.CAMERA_CENTER, 0), (self.CAMERA_CENTER, self.CAMERA_HEIGHT), (255,255,255), 1)
-                        if self.HIGHLIGHT: img_highlight = img + np.dstack((100 * mask, 100 * mask, 0 *mask))
+                        if self.HIGHLIGHT: img = img + np.dstack((100 * mask, 100 * mask, 0 *mask))
                         if self.VERBOSE: pretty_print('DISP', 'Highlighted detected plants')
-                        output_images.append(img_highlight)
+                        output_images.append(img)
                     except Exception as error:
                         pretty_print('DISP', 'ERROR: %s' % str(error))
                 if self.VERBOSE: pretty_print('DISP', 'Stacking images ...')
