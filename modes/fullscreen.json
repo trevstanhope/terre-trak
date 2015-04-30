@@ -33,9 +33,8 @@
     "DISPLAY_ON" : true,
     "GPS_ENABLED" : false,
     "VERBOSE" : true,
-    "MIN_VOLTAGE": 0.10,
-    "MAX_VOLTAGE": 8.00,
-    "SUPPLY_VOLTAGE": 9.69,
+    "MIN_VOLTAGE": 0.00,
+    "MAX_VOLTAGE": 5.00,
     "BRUSH_RANGE" : 6,
     "HIGHLIGHT" : true
 }
