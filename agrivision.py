@@ -366,7 +366,6 @@ class AgriVision:
                         if self.VERBOSE: pretty_print('DISPLAY', 'Image #%d' % (i+1))
                         img = images[i]
                         mask = masks[i]
-                        print img, mask
                         if img is None: img = np.zeros((self.CAMERA_HEIGHT, self.CAMERA_WIDTH, 3), np.uint8)
                         if mask is None: mask = np.zeros((self.CAMERA_HEIGHT, self.CAMERA_WIDTH), np.uint8)
                         (h, w, d) = img.shape
