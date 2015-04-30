@@ -1,5 +1,7 @@
 {
     "DEBUG" : false,
+    "PWM_MIN" : 0,
+    "PWM_MAX" : 255,
     "FULLSCREEN" : false,
     "CAMERAS" : [0],
     "FREQUENCY_LIMIT" : 50,

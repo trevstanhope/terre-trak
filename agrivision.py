@@ -1,10 +1,11 @@
 """
 Agri-Vision
+Precision Agriculture and Soil Sensing Group (PASS)
 McGill University, Department of Bioresource Engineering
 """
 
 __author__ = 'Trevor Stanhope'
-__version__ = '2.0.'
+__version__ = '2.01'
 
 ## Libraries
 import cv2, cv
@@ -30,7 +31,8 @@ except Exception as err:
 
 def pretty_print(task, msg, *args):
     date = datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-    print "%s %s %s" % (date, task, msg)
+    
+    print "%s\t%s\t%s" % (date, task, msg)
 
 ## Class
 class AgriVision:
@@ -52,43 +54,43 @@ class AgriVision:
         self.init_pid()
         self.init_db()
         self.init_gps()
-        self.init_display()
+        #self.init_display()
         
     # Initialize Cameras
     def init_cameras(self):
         
         # Setting variables
-        pretty_print('CAMERA', 'Initializing CV Variables')
+        pretty_print('CAM', 'Initializing CV Variables')
         if self.VERBOSE:
-            pretty_print('CAMERA', 'Camera Height: %d px' % self.CAMERA_HEIGHT)
-            pretty_print('CAMERA', 'Camera Depth: %d cm' % self.CAMERA_DEPTH)
-            pretty_print('CAMERA', 'Camera FOV: %f rad' % self.CAMERA_FOV)
+            pretty_print('CAM', 'Camera Height: %d px' % self.CAMERA_HEIGHT)
+            pretty_print('CAM', 'Camera Depth: %d cm' % self.CAMERA_DEPTH)
+            pretty_print('CAM', 'Camera FOV: %f rad' % self.CAMERA_FOV)
         self.CAMERA_CENTER = self.CAMERA_WIDTH / 2
         if self.VERBOSE: 
             pretty_print('INIT', 'Image Center: %d px' % self.CAMERA_CENTER)
         self.GROUND_WIDTH = 2 * self.CAMERA_DEPTH * np.tan(self.CAMERA_FOV / 2.0)
-        pretty_print('CAMERA', 'Ground Width: %d cm' % self.GROUND_WIDTH)
-        pretty_print('CAMERA', 'Brush Range: +/- %d cm' % self.BRUSH_RANGE)
+        pretty_print('CAM', 'Ground Width: %d cm' % self.GROUND_WIDTH)
+        pretty_print('CAM', 'Brush Range: +/- %d cm' % self.BRUSH_RANGE)
         self.PIXEL_PER_CM = self.CAMERA_WIDTH / self.GROUND_WIDTH
-        pretty_print('CAMERA', 'Pixel-per-cm: %d px/cm' % self.PIXEL_PER_CM)
+        pretty_print('CAM', 'Pixel-per-cm: %d px/cm' % self.PIXEL_PER_CM)
         self.PIXEL_RANGE = int(self.PIXEL_PER_CM * self.BRUSH_RANGE) 
-        pretty_print('CAMERA', 'Pixel Range: +/- %d px' % self.PIXEL_RANGE)
+        pretty_print('CAM', 'Pixel Range: +/- %d px' % self.PIXEL_RANGE)
         self.PIXEL_MIN = self.CAMERA_CENTER - self.PIXEL_RANGE
         self.PIXEL_MAX = self.CAMERA_CENTER + self.PIXEL_RANGE
         
         # Attempt to set each camera index/name
-        pretty_print('CAMERA', 'Initializing Cameras')
+        pretty_print('CAM', 'Initializing Cameras')
         self.cameras = []
         for i in self.CAMERAS:
             try:
-                if self.VERBOSE: pretty_print('CAMERA', 'Attaching Camera #%d' % i)
+                if self.VERBOSE: pretty_print('CAM', 'Attaching Camera #%d' % i)
                 cam = cv2.VideoCapture(i)
                 cam.set(cv.CV_CAP_PROP_FRAME_WIDTH, self.CAMERA_WIDTH)
                 cam.set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.CAMERA_HEIGHT)
                 self.cameras.append(cam)
-                if self.VERBOSE: pretty_print('CAMERA', 'Camera #%d OK' % i)
+                if self.VERBOSE: pretty_print('CAM', 'Camera #%d OK' % i)
             except Exception as error:
-                pretty_print('ERROR', str(error))
+                pretty_print('CAM', 'ERROR: %s' % str(error))
     
     # Initialize Database
     def init_db(self):
@@ -103,23 +105,21 @@ class AgriVision:
             self.collection = self.database[self.LOG_NAME]
             if self.VERBOSE: pretty_print('DB', 'Setup OK')
         except Exception as error:
-            pretty_print('\tERROR', str(error))
+            pretty_print('DB', 'ERROR: %s' % str(error))
     
     # Initialize PID Controller
     def init_pid(self):
         if self.VERBOSE: pretty_print('PID', 'Initialing Electro-Hydraulics')
-        self.MIN_PWM = 0
-        if self.VERBOSE: pretty_print('PID', 'PWM Minimum: %d' % self.MIN_PWM)
-        self.MAX_PWM = 255
-        if self.VERBOSE: pretty_print('PID', 'PWM Maximum: %d' % self.MAX_PWM)
-        self.CENTER_PWM = int(self.MIN_PWM + self.MAX_PWM / 2.0)
+        if self.VERBOSE: pretty_print('PID', 'PWM Minimum: %d' % self.PWM_MIN)
+        if self.VERBOSE: pretty_print('PID', 'PWM Maximum: %d' % self.PWM_MAX)
+        self.CENTER_PWM = int(self.PWM_MIN + self.PWM_MAX / 2.0)
         if self.VERBOSE: pretty_print('PID', 'PWM Center: %d' % self.CENTER_PWM)
         try:
             if self.VERBOSE: pretty_print('PID', 'Default Number of Averages: %d' % self.NUM_AVERAGES)
             self.offset_history = [self.CAMERA_CENTER] * self.NUM_AVERAGES
             if self.VERBOSE: pretty_print('PID', 'Setup OK')
         except Exception as error:
-            pretty_print('ERROR', str(error))
+            pretty_print('PID', 'ERROR: %s' % str(error))
         self.average = 0
         self.estimated = 0
         self.pwm = 0
@@ -134,7 +134,7 @@ class AgriVision:
             self.log.write(','.join(['time', 'lat', 'long', 'speed', 'cam0', 'cam1', 'estimate', 'average', 'pwm','\n']))
             if self.VERBOSE: pretty_print('LOG', 'Setup OK')
         except Exception as error:
-            pretty_print('\tERROR', str(error))
+            pretty_print('ERROR', str(error))
             
     # Initialize Arduino
     def init_arduino(self):
@@ -145,7 +145,7 @@ class AgriVision:
             self.arduino = serial.Serial(self.SERIAL_DEVICE, self.SERIAL_BAUD)
             pretty_print('ARDUINO', 'Setup OK')
         except Exception as error:
-            if self.VERBOSE: pretty_print('ERROR', str(error))
+            pretty_print('ARDUINO', 'ERROR: %s' % str(error))
         
     # Initialize GPS
     def init_gps(self):
@@ -157,7 +157,7 @@ class AgriVision:
                 self.gpsd.stream(gps.WATCH_ENABLE)
                 thread.start_new_thread(self.update_gps, ())
             except Exception as err:
-                pretty_print('ERROR', 'GPS not available! %s' % str(err))
+                pretty_print('GPS', 'GPS not available! %s' % str(err))
                 self.latitude = 0
                 self.longitude = 0
                 self.speed = 0
@@ -174,8 +174,7 @@ class AgriVision:
             if self.DISPLAY_ON:
                 thread.start_new_thread(self.update_display, ())
         except Exception as error:
-            pretty_print('ERROR', str(error))
-        time.sleep(1)
+            pretty_print('DISP', 'ERROR: %s' % str(error))
 
     ## Capture Images
     """
@@ -183,17 +182,17 @@ class AgriVision:
     2. Repeat for each capture interface
     """
     def capture_images(self):
-        if self.VERBOSE: pretty_print('CAMERA', 'Capturing Images')
+        if self.VERBOSE: pretty_print('CAM', 'Capturing Images ...')
         images = []
         for cam in self.cameras:
-            if self.VERBOSE: pretty_print('CAMERA', 'Camera ID: %s' % str(cam))
-            (s, bgr) = cam.read() 
+            if self.VERBOSE: pretty_print('CAM', 'Attempting on cam ID: %s' % str(cam))
+            (s, bgr) = cam.read()
             if s:
                 images.append(bgr)
-                if self.VERBOSE: pretty_print('CAMERA', 'Capture successful')
+                if self.VERBOSE: pretty_print('CAM', 'Capture successful')
             else:
                 images.append(None)
-                if self.VERBOSE: pretty_print('CAMERA', 'Capture failed')
+                if self.VERBOSE: pretty_print('CAM', 'ERROR: Capture failed')
         return images
         
     ## Plant Segmentation Filter
@@ -218,12 +217,13 @@ class AgriVision:
                     threshold_min = np.array([hue_min, sat_min, val_min], np.uint8)
                     threshold_max = np.array([hue_max, sat_max, val_max], np.uint8)
                     mask = cv2.inRange(hsv, threshold_min, threshold_max)
-                    masks.append(mask) 
+                    masks.append(mask)
+                    if self.VERBOSE: pretty_print('CV', 'Mask Number #%d was successful' % len(masks))
                 except Exception as error:
                     pretty_print('CV', str(error))
             else:
                 masks.append(None)
-        if self.VERBOSE: pretty_print('CV', 'Number of Masks: %d mask(s) ' % len(masks))
+                if self.VERBOSE: pretty_print('CV', 'Mask Number #%d is blank' % len(masks))
         return masks
         
     ## Find Plants
@@ -252,8 +252,8 @@ class AgriVision:
                     centroid = int(np.median(probable[0])) - self.CAMERA_CENTER
                     indices.append(centroid)
                 except Exception as error:
-                    pretty_print('ERROR', '%s' % str(error))
-        if self.VERBOSE: pretty_print('CV', 'Detected Indices : %s' % str(indices))
+                    pretty_print('CV', '%s' % str(error))
+        if self.VERBOSE: pretty_print('CV', 'Detected indices: %s' % str(indices))
         return indices
         
     ## Best Guess for row based on multiple offsets from indices
@@ -269,7 +269,7 @@ class AgriVision:
         try:
             est =  int(np.mean(indices))
         except Exception as error:
-            pretty_print('ERROR', str(error))
+            pretty_print('ROW', 'ERROR: %s' % str(error))
             est = self.CAMERA_CENTER
         self.offset_history.append(est)
         while len(self.offset_history) > self.NUM_AVERAGES:
@@ -284,8 +284,10 @@ class AgriVision:
          
     ## Control Hydraulics
     """
-    1. Get PWM response corresponding to average offset
-    2. Send PWM response over serial to controller
+    Calculates the PID output for the PWM controller
+    Arguments: est, avg, diff
+    Requires: PWM_MAX, PWM_MIN, CENTER_PWM
+    Returns: PWM
     """
     def calculate_output(self, estimate, average, diff):
         if self.VERBOSE: pretty_print('PID', 'Calculating PID Output ...')
@@ -294,20 +296,33 @@ class AgriVision:
             i = average * self.I_COEF
             d = diff  * self.D_COEF
             if self.VERBOSE: pretty_print('PID', str([p,i,d]))
-            pwm = int(p + i + d + self.CENTER_PWM)
-            if pwm > self.MAX_PWM:
-                pwm = self.MAX_PWM
-            elif pwm < self.MIN_PWM:
-                pwm = self.MIN_PWM
-            try:
-                self.arduino.write(str(pwm) + '\n')
-            except Exception as error:
-                pretty_print('ERROR', str(error))
-            if self.VERBOSE: pretty_print('ARDUINO', 'PWM Output: %s' % str(pwm))
+            pwm = int(p + i + d + self.CENTER_PWM) # offset to zero
+            if pwm > self.PWM_MAX:
+                pwm = self.PWM_MAX
+            elif pwm < self.PWM_MIN:
+                pwm = self.PWM_MIN
+            if self.VERBOSE: pretty_print('PID', 'PWM Output: %s' % str(pwm))
             return pwm
         except Exception as error:
-            pretty_print('ERROR', str(error))
+            pretty_print('PID', 'ERROR: %s' % str(error))
             return self.CENTER_PWM
+
+    ## Control Hydraulics
+    """
+    1. Get PWM response corresponding to average offset
+    2. Send PWM response over serial to controller
+    """
+    def set_controller(self, pwm):
+        if self.VERBOSE: pretty_print('CTRL', 'Setting controller state ...')
+        try:            
+            try:
+                assert self.arduino is not None
+                self.arduino.write(str(pwm) + '\n') # Write to PWM adaptor
+                if self.VERBOSE: pretty_print('CTRL', 'Wrote successfully')
+            except Exception as error:
+                pretty_print('CTRL', 'ERROR: %s' % str(error))
+        except Exception as error:
+            pretty_print('CTRL', 'ERROR: %s' % str(error))
     
     ## Log to Mongo
     """
@@ -317,10 +332,11 @@ class AgriVision:
     def log_db(self, sample):
         if self.VERBOSE: pretty_print('DB', 'Logging to Database ...')
         try:          
+            assert self.collection is not None
             doc_id = self.collection.insert(sample)
+            if self.VERBOSE: pretty_print('DB', 'Doc ID: %s' % str(doc_id))
         except Exception as error:
-            pretty_print('ERROR', str(error))
-        if self.VERBOSE: pretty_print('DB', 'Doc ID: %s' % str(doc_id))
+            pretty_print('DB', 'ERROR: %s' % str(error))
         return doc_id
     
     ## Log to File
@@ -331,6 +347,7 @@ class AgriVision:
     def log_file(self, sample):
         if self.VERBOSE: pretty_print('LOG', 'Logging to File')
         try:
+            assert self.log is not None
             time = str(sample['time'])
             latitude = str(sample['lat'])
             longitude = str(sample['long'])
@@ -340,7 +357,7 @@ class AgriVision:
             pwm = str(sample['pwm'])
             self.log.write(','.join([time, latitude, longitude, speed, estimate, average, pwm,'\n']))
         except Exception as error:
-            pretty_print('ERROR', str(error))
+            pretty_print('LOG', 'ERROR: %s' % str(error))
                 
     ## Displays 
     """
@@ -349,9 +366,8 @@ class AgriVision:
     3. Output GUI display
     """
     def update_display(self):
-        while True:
-            time.sleep(0.1)
-            if self.VERBOSE: pretty_print('DISPLAY', 'Displaying Images')
+        if True:
+            if self.VERBOSE: pretty_print('DISP', 'Displaying Images ...')
             try:
                 pwm = self.pwm
                 average = self.average + self.CAMERA_CENTER
@@ -360,31 +376,31 @@ class AgriVision:
                 images = self.images
                 output_images = []
                 distance = round((average - self.CAMERA_CENTER) / float(self.PIXEL_PER_CM), 1)
-                volts = round((pwm * (self.MAX_VOLTAGE - self.MIN_VOLTAGE) / (self.MAX_PWM - self.MIN_PWM) + self.MIN_VOLTAGE), 2)
-                for i in range(len(self.CAMERAS)):
+                volts = round((pwm * (self.MAX_VOLTAGE - self.MIN_VOLTAGE) / (self.PWM_MAX - self.PWM_MIN) + self.MIN_VOLTAGE), 2)
+                for i in xrange(len(self.CAMERAS)):
                     try:
-                        if self.VERBOSE: pretty_print('DISPLAY', 'Image #%d' % (i+1))
+                        if self.VERBOSE: pretty_print('DISP', 'Image #%d' % (i+1))
                         img = images[i]
                         mask = masks[i]
                         if img is None: img = np.zeros((self.CAMERA_HEIGHT, self.CAMERA_WIDTH, 3), np.uint8)
                         if mask is None: mask = np.zeros((self.CAMERA_HEIGHT, self.CAMERA_WIDTH), np.uint8)
                         (h, w, d) = img.shape
-                        if self.VERBOSE: pretty_print('DISPLAY', str(mask.shape))
-                        if self.VERBOSE: pretty_print('DISPLAY', str(img.shape))
+                        if self.VERBOSE: pretty_print('DISP', 'Mask shape: %s' % str(mask.shape))
+                        if self.VERBOSE: pretty_print('DISP', 'Img shape: %s' % str(img.shape))
                         cv2.line(img, (self.PIXEL_MIN, 0), (self.PIXEL_MIN, self.CAMERA_HEIGHT), (0,0,255), 1)
                         cv2.line(img, (self.PIXEL_MAX, 0), (self.PIXEL_MAX, self.CAMERA_HEIGHT), (0,0,255), 1)
                         cv2.line(img, (average, 0), (average, self.CAMERA_HEIGHT), (0,255,0), 2)
                         cv2.line(img, (self.CAMERA_CENTER, 0), (self.CAMERA_CENTER, self.CAMERA_HEIGHT), (255,255,255), 1)
                         if self.HIGHLIGHT: img_highlight = img + np.dstack((100 * mask, 0 * mask, 0 *mask))
-                        if self.VERBOSE: pretty_print('DISPLAY', 'Highlight Detection')
+                        if self.VERBOSE: pretty_print('DISP', 'Highlighted detected plants')
                         bottom_pad = h / 10
                         pad = np.zeros((bottom_pad, self.CAMERA_WIDTH, 3), np.uint8) # add blank space
                         output = np.vstack([img_highlight, pad])
-                        if self.VERBOSE: pretty_print('DISPLAY', 'Padded Image')
+                        if self.VERBOSE: pretty_print('DISP', 'Padded image')
                         output_images.append(output)
                     except Exception as error:
-                        pretty_print('DISPLAY', str(error))
-                if self.VERBOSE: pretty_print('DISPLAY', 'Stacking images')
+                        pretty_print('DISP', 'ERROR: %s' % str(error))
+                if self.VERBOSE: pretty_print('DISP', 'Stacking images ...')
                 output_small = np.hstack(output_images)
                 output_large = cv2.resize(output_small, (1024, 768))
                 if average - self.CAMERA_CENTER >= 0:
@@ -396,12 +412,12 @@ class AgriVision:
                 cv2.putText(output_large, volts_str, (840,760), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
                 cv2.namedWindow('Agri-Vision', cv2.WINDOW_NORMAL)
                 if self.FULLSCREEN: cv2.setWindowProperty('Agri-Vision', cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
-                if self.VERBOSE: pretty_print('DISPLAY', str(output_large.shape))
+                if self.VERBOSE: pretty_print('DISP', 'Output shape: %s' % str(output_large.shape))
                 cv2.imshow('Agri-Vision', output_large)
                 if cv2.waitKey(5) == 0:
                     pass
             except Exception as error:
-                pretty_print('DISPLAY', str(error))
+                pretty_print('DISP', str(error))
                     
     ## Update GPS
     """
@@ -424,18 +440,21 @@ class AgriVision:
     3. Release capture interfaces 
     """
     def close(self):
-        if self.VERBOSE: pretty_print('SYSTEM', 'Shutting Down')
+        if self.VERBOSE: pretty_print('SYSTEM', 'Shutting Down ...')
+        time.sleep(1)
         try:
-            if self.VERBOSE: pretty_print('ARDUINO', 'Closing Arduino')
+            if self.VERBOSE: pretty_print('ARDUINO', 'Closing Arduino ...')
             self.arduino.close() ## Disable arduino
+            time.sleep(0.5)
         except Exception as error:
-            pretty_print('ARDUINO', str(error))
+            pretty_print('ARDUINO', 'ERROR: %s' % str(error))
         for i in range(len(self.cameras)):
             try:
-                if self.VERBOSE: pretty_print('CAMERA', 'Closing Camera #%d' % i)
+                if self.VERBOSE: pretty_print('CAM', 'Closing Camera #%d ...' % i)
                 self.cameras[i].release() ## Disable cameras
+                time.sleep(0.5)
             except Exception as error:
-                pretty_print('\tCAMERA ERROR', str(error))
+                pretty_print('CAM', 'ERROR: %s' % str(error))
         cv2.destroyAllWindows() ## Close windows
         
     ## Run  
@@ -456,11 +475,13 @@ class AgriVision:
     def run(self):
         while True:
             try:
+                time.sleep(0.03)
                 images = self.capture_images()
                 masks = self.plant_filter(images)
                 offsets = self.find_offset(masks)
                 (est, avg, diff) = self.estimate_row(offsets)
                 pwm = self.calculate_output(est, avg, diff)
+                err = self.set_controller(pwm)
                 sample = {
                     'offsets' : offsets, 
                     'estimated' : est,
@@ -479,6 +500,7 @@ class AgriVision:
                 self.estimated = est
                 if self.MONGO_ON: doc_id = self.log_db(sample)
                 if self.LOGFILE_ON: self.log_file(sample)
+                if self.DISPLAY_ON: thread.start_new_thread(self.update_display, ())
             except KeyboardInterrupt as error:
                 self.close()    
                 break
