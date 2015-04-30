@@ -183,6 +183,7 @@ class AgriVision:
             if self.VERBOSE: pretty_print('CAM', 'Attempting on cam ID: %s' % str(cam))
             (s, bgr) = cam.read()
             if s:
+                cv.Flip(bgr, flipMode=self.CAMERA_ROTATION)
                 images.append(bgr)
                 if self.VERBOSE: pretty_print('CAM', 'Capture successful')
             else:
