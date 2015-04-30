@@ -85,8 +85,12 @@ class AgriVision:
             try:
                 if self.VERBOSE: pretty_print('CAM', 'Attaching Camera #%d' % i)
                 cam = cv2.VideoCapture(i)
-                cam.set(cv.CV_CAP_PROP_FRAME_WIDTH, self.CAMERA_WIDTH)
-                cam.set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.CAMERA_HEIGHT)
+                if not self.CAMERA_ROTATED:
+                    cam.set(cv.CV_CAP_PROP_FRAME_WIDTH, self.CAMERA_WIDTH)
+                    cam.set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.CAMERA_HEIGHT)
+                else:
+                    cam.set(cv.CV_CAP_PROP_FRAME_WIDTH, self.CAMERA_HEIGHT)
+                    cam.set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.CAMERA_WIDTH)
                 self.cameras.append(cam)
                 if self.VERBOSE: pretty_print('CAM', 'Camera #%d OK' % i)
             except Exception as error:
@@ -171,6 +175,11 @@ class AgriVision:
         except Exception as error:
             pretty_print('DISP', 'ERROR: %s' % str(error))
 
+    ## Rotate image
+    def rotate_image(self, bgr):
+        bgr = cv2.transpose(bgr)
+        return bgr
+
     ## Capture Images
     """
     1. Attempt to capture an image
@@ -183,9 +192,9 @@ class AgriVision:
             if self.VERBOSE: pretty_print('CAM', 'Attempting on cam ID: %s' % str(cam))
             (s, bgr) = cam.read()
             if s:
-                bgr = np.rot90(bgr, self.CAMERA_ROTATION)
+                if self.CAMERA_ROTATED: bgr = self.rotate_image(bgr)
                 images.append(bgr)
-                if self.VERBOSE: pretty_print('CAM', 'Capture successful')
+                if self.VERBOSE: pretty_print('CAM', 'Capture successful: %s' % str(bgr.shape))
             else:
                 images.append(None)
                 if self.VERBOSE: pretty_print('CAM', 'ERROR: Capture failed')
