@@ -37,5 +37,5 @@
     "MAX_VOLTAGE": 2.50,
     "SUPPLY_VOLTAGE": 5.0,
     "BRUSH_RANGE" : 6,
-    "HIGHLIGHT" : true
+    "HIGHLIGHT" : false
 }
