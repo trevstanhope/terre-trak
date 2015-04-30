@@ -475,7 +475,6 @@ class AgriVision:
     def run(self):
         while True:
             try:
-                time.sleep(0.03)
                 images = self.capture_images()
                 masks = self.plant_filter(images)
                 offsets = self.find_offset(masks)
