@@ -81,12 +81,16 @@ class AgriVision:
         # Attempt to set each camera index/name
         pretty_print('CAM', 'Initializing Cameras')
         self.cameras = []
-        for i in self.CAMERAS:
+        for i in range(self.CAMERAS):
             try:
                 if self.VERBOSE: pretty_print('CAM', 'Attaching Camera #%d' % i)
                 cam = cv2.VideoCapture(i)
-                cam.set(cv.CV_CAP_PROP_FRAME_WIDTH, self.CAMERA_WIDTH)
-                cam.set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.CAMERA_HEIGHT)
+                if not self.CAMERA_ROTATED:
+                    cam.set(cv.CV_CAP_PROP_FRAME_WIDTH, self.CAMERA_WIDTH)
+                    cam.set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.CAMERA_HEIGHT)
+                else:
+                    cam.set(cv.CV_CAP_PROP_FRAME_WIDTH, self.CAMERA_HEIGHT)
+                    cam.set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.CAMERA_WIDTH)
                 self.cameras.append(cam)
                 if self.VERBOSE: pretty_print('CAM', 'Camera #%d OK' % i)
             except Exception as error:
@@ -138,7 +142,7 @@ class AgriVision:
             
     # Initialize Controller
     def init_controller(self):
-        if self.VERBOSE: pretty_print('', 'Initializing controller ...')
+        if self.VERBOSE: pretty_print('CTRL', 'Initializing controller ...')
         try:
             if self.VERBOSE: pretty_print('CTRL', 'Device: %s' % str(self.SERIAL_DEVICE))
             if self.VERBOSE: pretty_print('CTRL', 'Baud Rate: %s' % str(self.SERIAL_BAUD))
@@ -171,6 +175,11 @@ class AgriVision:
         except Exception as error:
             pretty_print('DISP', 'ERROR: %s' % str(error))
 
+    ## Rotate image
+    def rotate_image(self, bgr):
+        bgr = cv2.transpose(bgr)
+        return bgr
+
     ## Capture Images
     """
     1. Attempt to capture an image
@@ -183,8 +192,9 @@ class AgriVision:
             if self.VERBOSE: pretty_print('CAM', 'Attempting on cam ID: %s' % str(cam))
             (s, bgr) = cam.read()
             if s:
+                if self.CAMERA_ROTATED: bgr = self.rotate_image(bgr)
                 images.append(bgr)
-                if self.VERBOSE: pretty_print('CAM', 'Capture successful')
+                if self.VERBOSE: pretty_print('CAM', 'Capture successful: %s' % str(bgr.shape))
             else:
                 images.append(None)
                 if self.VERBOSE: pretty_print('CAM', 'ERROR: Capture failed')
@@ -363,7 +373,10 @@ class AgriVision:
     """
     def update_display(self):
         if self.updating:
+<<<<<<< HEAD
             time.sleep(1 / 20) # delay by frames per second
+=======
+>>>>>>> 2cddb454e4763e251bc1ea239f39efda2780bfcb
             return # if the display is already updating, wait and exit (puts less harm on the CPU)
         else:
             self.updating = True
@@ -377,7 +390,7 @@ class AgriVision:
                 output_images = []
                 distance = round((average - self.CAMERA_CENTER) / float(self.PIXEL_PER_CM), 1)
                 volts = round((pwm * (self.MAX_VOLTAGE - self.MIN_VOLTAGE) / (self.PWM_MAX - self.PWM_MIN) + self.MIN_VOLTAGE), 2)
-                for i in xrange(len(self.CAMERAS)):
+                for i in xrange(self.CAMERAS):
                     try:
                         if self.VERBOSE: pretty_print('DISP', 'Image #%d' % (i+1))
                         img = images[i]
@@ -391,24 +404,50 @@ class AgriVision:
                         cv2.line(img, (self.PIXEL_MAX, 0), (self.PIXEL_MAX, self.CAMERA_HEIGHT), (0,0,255), 1)
                         cv2.line(img, (average, 0), (average, self.CAMERA_HEIGHT), (0,255,0), 2)
                         cv2.line(img, (self.CAMERA_CENTER, 0), (self.CAMERA_CENTER, self.CAMERA_HEIGHT), (255,255,255), 1)
-                        if self.HIGHLIGHT: img_highlight = img + np.dstack((100 * mask, 100 * mask, 0 *mask))
+                        if self.HIGHLIGHT: img = img + np.dstack((100 * mask, 100 * mask, 0 *mask))
                         if self.VERBOSE: pretty_print('DISP', 'Highlighted detected plants')
-                        output_images.append(img_highlight)
+                        output_images.append(img)
                     except Exception as error:
                         pretty_print('DISP', 'ERROR: %s' % str(error))
                 if self.VERBOSE: pretty_print('DISP', 'Stacking images ...')
                 output_small = np.hstack(output_images)
-                pad = np.zeros((self.CAMERA_HEIGHT / 10, len(self.CAMERAS) * self.CAMERA_WIDTH, 3), np.uint8) # add blank space
+                pad = np.zeros((self.CAMERA_HEIGHT * 0.1, self.CAMERAS * self.CAMERA_WIDTH, 3), np.uint8) # add blank space
                 output_padded = np.vstack([output_small, pad])
                 if self.VERBOSE: pretty_print('DISP', 'Padded image')
-                output_large = cv2.resize(output_padded, (1024, 768))
+                output_large = cv2.resize(output_padded, (self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT))
+
+                # Offset Distance
                 if average - self.CAMERA_CENTER >= 0:
                     distance_str = str("+%2.1f cm" % distance)
                 elif average - self.CAMERA_CENTER< 0:
                     distance_str = str("%2.1f cm" % distance)
+                cv2.putText(output_large, distance_str, (int(self.DISPLAY_WIDTH * 0.01), int(self.DISPLAY_WIDTH * 0.74)), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
+                
+                # Output Voltage
                 volts_str = str("%2.1f V" % volts)
-                cv2.putText(output_large, distance_str, (int(1024 * 0.33), int(1024 * 0.74)), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
-                cv2.putText(output_large, volts_str, (int(1024 * 0.82), int(1024 * 0.74)), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
+                cv2.putText(output_large, volts_str, (int(self.DISPLAY_WIDTH * 0.82), int(self.DISPLAY_WIDTH * 0.74)), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
+                
+                # Arrow
+                if average - self.CAMERA_CENTER >= 0:
+                    p = (int(self.DISPLAY_WIDTH * 0.45), int(self.DISPLAY_WIDTH * 0.72))
+                    q = (int(self.DISPLAY_WIDTH * 0.55), int(self.DISPLAY_WIDTH * 0.72))
+                elif average - self.CAMERA_CENTER< 0:
+                    p = (int(self.DISPLAY_WIDTH * 0.55), int(self.DISPLAY_WIDTH * 0.72))
+                    q = (int(self.DISPLAY_WIDTH * 0.45), int(self.DISPLAY_WIDTH * 0.72))
+                color = (255,255,255)
+                thickness = 8
+                line_type = 8
+                shift = 0
+                arrow_magnitude=20
+                cv2.line(output_large, p, q, color, thickness, line_type, shift) # draw arrow tail
+                angle = np.arctan2(p[1]-q[1], p[0]-q[0])
+                p = (int(q[0] + arrow_magnitude * np.cos(angle + np.pi/4)), # starting point of first line of arrow head 
+                int(q[1] + arrow_magnitude * np.sin(angle + np.pi/4)))
+                cv2.line(output_large, p, q, color, thickness, line_type, shift) # draw first half of arrow head
+                p = (int(q[0] + arrow_magnitude * np.cos(angle - np.pi/4)), # starting point of second line of arrow head 
+                int(q[1] + arrow_magnitude * np.sin(angle - np.pi/4)))
+                cv2.line(output_large, p, q, color, thickness, line_type, shift) # draw second half of arrow head
+
                 cv2.namedWindow('Agri-Vision', cv2.WINDOW_NORMAL)
                 if self.FULLSCREEN: cv2.setWindowProperty('Agri-Vision', cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
                 if self.VERBOSE: pretty_print('DISP', 'Output shape: %s' % str(output_large.shape))
@@ -506,7 +545,7 @@ class AgriVision:
                 break
             except UnboundLocalError as error:
                 pass
-    
+
 ## Main
 if __name__ == '__main__':
     session = AgriVision(CONFIG_FILE)
