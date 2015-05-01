@@ -2,6 +2,9 @@
 Agri-Vision
 Precision Agriculture and Soil Sensing Group (PASS)
 McGill University, Department of Bioresource Engineering
+
+IDEAS:
+- Rotation compensation --> take Hough Line of plants to estimate row angle
 """
 
 __author__ = 'Trevor Stanhope'
@@ -27,7 +30,8 @@ import ast
 try:
     CONFIG_FILE = '%s' % sys.argv[1]
 except Exception as err:
-    CONFIG_FILE = 'modes/default.json'
+    settings = open('settings.cfg').read()
+    CONFIG_FILE = settings.rstrip()
 
 def pretty_print(task, msg, *args):
     date = datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S.%f")

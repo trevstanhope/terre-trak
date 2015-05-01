@@ -1,0 +1,6 @@
+#!/bin/sh
+# Make file and upload to controller
+
+# Arduino
+#make 
+#make upload 
