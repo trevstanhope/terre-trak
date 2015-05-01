@@ -373,10 +373,6 @@ class AgriVision:
     """
     def update_display(self):
         if self.updating:
-<<<<<<< HEAD
-            time.sleep(1 / 20) # delay by frames per second
-=======
->>>>>>> 2cddb454e4763e251bc1ea239f39efda2780bfcb
             return # if the display is already updating, wait and exit (puts less harm on the CPU)
         else:
             self.updating = True
