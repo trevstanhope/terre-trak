@@ -389,6 +389,7 @@ class AgriVision:
                 images = self.images
                 output_images = []
                 distance = round((average - self.CAMERA_CENTER) / float(self.PIXEL_PER_CM), 1)
+                if self.VERBOSE: pretty_print('DISP', 'Offset Distance: %d' % distance)
                 volts = round((pwm * (self.MAX_VOLTAGE - self.MIN_VOLTAGE) / (self.PWM_MAX - self.PWM_MIN) + self.MIN_VOLTAGE), 2)
                 for i in xrange(self.CAMERAS):
                     try:

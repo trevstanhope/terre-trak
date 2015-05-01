@@ -1,12 +1,5 @@
 #!/bin/sh
 xset s noblank
 xset s off -dpms
-cd .. # all paths relative to this file's location
-echo "The current directory of this script is:"
-ls 
-if  "$1" != "" ; then
-    DIR="$1"
-else
-    DIR=""
-fi
-python agrivision.py $DIR
+cd ~/agri-vision # the repo must be stored in ~
+python agrivision.py
