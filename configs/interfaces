@@ -5,7 +5,12 @@
 auto lo
 iface lo inet loopback
 
+# eth0 is DHCP lan
 auto eth0
-iface eth0 inet static
+iface eth0 inet dhcp
+
+# eth1 is pc-pc lan (in-situ debug)
+auto eth1
+iface eth1 inet static
 	address 192.168.1.1
 	netmask 255.255.255.0

@@ -354,15 +354,16 @@ class AgriVision:
         except Exception as error:
             pretty_print('LOG', 'ERROR: %s' % str(error))
                 
-    ## Displays 
+    ## Update the Display
     """
+    0. Check for concurrent update process
     1. Draw lines on RGB images
     2. Draw lines on ABP masks
     3. Output GUI display
     """
     def update_display(self):
         if self.updating:
-            time.sleep(1 / 30) # delay by frames per second
+            time.sleep(1 / 20) # delay by frames per second
             return # if the display is already updating, wait and exit (puts less harm on the CPU)
         else:
             self.updating = True

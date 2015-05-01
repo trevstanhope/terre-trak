@@ -81,6 +81,8 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
         xset -dpms
         xset s noblank
         xset s off
+        
+        echo "Disabling Mouse ..."
         apt-get install unclutter
         cp configs/unclutter /etc/default/
         

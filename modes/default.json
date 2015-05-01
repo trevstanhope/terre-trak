@@ -28,7 +28,7 @@
     "LOGFILE_ON" : false,
     "MONGO_ON" : false,
     "DISPLAY_ON" : true,
-    "GPS_ENABLED" : false,
+    "GPS_ENABLED" : true,
     "VERBOSE" : true,
     "MIN_VOLTAGE": 0.10,
     "MAX_VOLTAGE": 8.00,
