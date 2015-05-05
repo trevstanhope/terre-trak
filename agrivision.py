@@ -158,6 +158,9 @@ class AgriVision:
     # Initialize GPS
     def init_gps(self):
         if self.VERBOSE: pretty_print('GPS', 'Initializing GPS ...')
+        self.latitude = 0
+        self.longitude = 0
+        self.speed = 0
         try:
             if self.VERBOSE: pretty_print('GPS', 'Enabing GPS ...')
             self.gpsd = gps.gps()
@@ -165,9 +168,6 @@ class AgriVision:
             thread.start_new_thread(self.update_gps, ())
         except Exception as err:
             pretty_print('GPS', 'WARNING: GPS not available! %s' % str(err))
-            self.latitude = 0
-            self.longitude = 0
-            self.speed = 0
     
     # Display
     def init_display(self):
