@@ -1,5 +1,4 @@
 #!/bin/sh
 xset s noblank
 xset s off -dpms
-cd /root/agri-vision # the repo must be stored in ~
 python agrivision.py
