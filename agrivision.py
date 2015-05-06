@@ -82,7 +82,9 @@ class AgriVision:
         self.PIXEL_RANGE = int(self.PIXEL_PER_CM * self.BRUSH_RANGE) 
         pretty_print('CAM', 'Pixel Range: +/- %d px' % self.PIXEL_RANGE)
         self.PIXEL_MIN = self.CAMERA_CENTER - self.PIXEL_RANGE
-        self.PIXEL_MAX = self.CAMERA_CENTER + self.PIXEL_RANGE      
+        self.PIXEL_MAX = self.CAMERA_CENTER + self.PIXEL_RANGE 
+        
+        # Set Thresholds     
         self.threshold_min = np.array([self.HUE_MIN, self.SAT_MIN, self.VAL_MIN], np.uint8)
         self.threshold_max = np.array([self.HUE_MAX, self.SAT_MAX, self.VAL_MAX], np.uint8)
         
@@ -194,6 +196,7 @@ class AgriVision:
     2. Repeat for each capture interface
     """
     def capture_images(self):
+        a = time.time()
         if self.VERBOSE: pretty_print('CAM', 'Capturing Images ...')
         images = []
         for cam in self.cameras:
@@ -206,6 +209,8 @@ class AgriVision:
             else:
                 images.append(None)
                 if self.VERBOSE: pretty_print('CAM', 'ERROR: Capture failed')
+        b = time.time()
+        if self.VERBOSE: pretty_print('CAM', '... %f ms' % ((b - a) * 1000))
         return images
         
     ## Plant Segmentation Filter
@@ -222,16 +227,21 @@ class AgriVision:
             if bgr is not None:
                 try:
                     hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+                    s_mean = hsv[:,:,1].mean()
+                    v_mean = hsv[:,:,2].mean()
+                    self.threshold_min[1] = s_mean
+                    self.threshold_min[2] = v_mean 
+                    pretty_print('BPPD', 'S:%f, V:%f' % (s_mean, v_mean))
                     mask = cv2.inRange(hsv, self.threshold_min, self.threshold_max)
                     masks.append(mask)
-                    if self.VERBOSE: pretty_print('CV', 'Mask Number #%d was successful' % len(masks))
+                    if self.VERBOSE: pretty_print('BPPD', 'Mask Number #%d was successful' % len(masks))
                 except Exception as error:
-                    pretty_print('CV', str(error))
+                    pretty_print('BPPD', str(error))
             else:
-                if self.VERBOSE: pretty_print('CV', 'Mask Number #%d is blank' % len(masks))
+                if self.VERBOSE: pretty_print('BPPD', 'Mask Number #%d is blank' % len(masks))
                 masks.append(None)
         b = time.time()
-        if self.VERBOSE: pretty_print('CV', 'plant_filter() ran in %f ms' % ((b - a) * 1000))
+        if self.VERBOSE: pretty_print('BPPD', '... %f ms' % ((b - a) * 1000))
         return masks
         
     ## Find Plants
@@ -264,7 +274,7 @@ class AgriVision:
                     pretty_print('CV', '%s' % str(error))
         if self.VERBOSE: pretty_print('CV', 'Detected indices: %s' % str(indices))
         b = time.time()
-        if self.VERBOSE: pretty_print('CV', 'find_offset() ran in %f ms' % ((b - a) * 1000))
+        if self.VERBOSE: pretty_print('CV', '... %f ms' % ((b - a) * 1000))
         return indices
         
     ## Best Guess for row based on multiple offsets from indices
@@ -293,7 +303,7 @@ class AgriVision:
             pretty_print('ROW', '(I) Moving Average: %s' % str(avg))
             pretty_print('ROW', '(D) Differential : %s' % str(diff))
         b = time.time()
-        if self.VERBOSE: pretty_print('CV', 'estimate_row() ran in %f ms' % ((b - a) * 1000))
+        if self.VERBOSE: pretty_print('ROW', '... %f ms' % ((b - a) * 1000))
         return est, avg, diff
          
     ## Control Hydraulics
@@ -304,6 +314,7 @@ class AgriVision:
     Returns: PWM
     """
     def calculate_output(self, estimate, average, diff):
+        a = time.time()
         if self.VERBOSE: pretty_print('PID', 'Calculating PID Output ...')
         try:
             p = estimate * self.P_COEF
@@ -316,10 +327,12 @@ class AgriVision:
             elif pwm < self.PWM_MIN:
                 pwm = self.PWM_MIN
             if self.VERBOSE: pretty_print('PID', 'PWM Output: %s' % str(pwm))
-            return pwm
         except Exception as error:
             pretty_print('PID', 'ERROR: %s' % str(error))
-            return self.CENTER_PWM
+            pwm = self.CENTER_PWM
+        b = time.time()
+        if self.VERBOSE: pretty_print('PID', '... %f ms' % ((b - a) * 1000))
+        return pwm
 
     ## Control Hydraulics
     """
@@ -327,6 +340,7 @@ class AgriVision:
     2. Send PWM response over serial to controller
     """
     def set_controller(self, pwm):
+        a = time.time()
         if self.VERBOSE: pretty_print('CTRL', 'Setting controller state ...')
         try:            
             try:
@@ -337,6 +351,8 @@ class AgriVision:
                 pretty_print('CTRL', 'ERROR: %s' % str(error))
         except Exception as error:
             pretty_print('CTRL', 'ERROR: %s' % str(error))
+        b = time.time()
+        if self.VERBOSE: pretty_print('CTRL', '... %f ms' % ((b - a) * 1000))
     
     ## Log to Mongo
     """
@@ -381,6 +397,7 @@ class AgriVision:
     3. Output GUI display
     """
     def update_display(self):
+        a = time.time()
         if self.updating:
             return # if the display is already updating, wait and exit (puts less harm on the CPU)
         else:
@@ -469,6 +486,8 @@ class AgriVision:
             except Exception as error:
                 pretty_print('DISP', str(error))
             self.updating = False
+        b = time.time()
+        if self.VERBOSE: pretty_print('DISP', '... %f ms' % ((b - a) * 1000))
                     
     ## Update GPS
     """
