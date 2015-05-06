@@ -65,6 +65,8 @@ class AgriVision:
         
         # Setting variables
         pretty_print('CAM', 'Initializing CV Variables')
+        if self.CAMERA_ROTATED:
+            self.CAMERA_HEIGHT, self.CAMERA_WIDTH = self.CAMERA_WIDTH, self.CAMERA_HEIGHT # flip dimensions if rotated
         if self.VERBOSE:
             pretty_print('CAM', 'Camera Height: %d px' % self.CAMERA_HEIGHT)
             pretty_print('CAM', 'Camera Depth: %d cm' % self.CAMERA_DEPTH)
@@ -80,7 +82,9 @@ class AgriVision:
         self.PIXEL_RANGE = int(self.PIXEL_PER_CM * self.BRUSH_RANGE) 
         pretty_print('CAM', 'Pixel Range: +/- %d px' % self.PIXEL_RANGE)
         self.PIXEL_MIN = self.CAMERA_CENTER - self.PIXEL_RANGE
-        self.PIXEL_MAX = self.CAMERA_CENTER + self.PIXEL_RANGE
+        self.PIXEL_MAX = self.CAMERA_CENTER + self.PIXEL_RANGE      
+        self.threshold_min = np.array([self.HUE_MIN, self.SAT_MIN, self.VAL_MIN], np.uint8)
+        self.threshold_max = np.array([self.HUE_MAX, self.SAT_MAX, self.VAL_MAX], np.uint8)
         
         # Attempt to set each camera index/name
         pretty_print('CAM', 'Initializing Cameras')
@@ -212,27 +216,22 @@ class AgriVision:
     4. Take hues within range from green-yellow to green-blue
     """
     def plant_filter(self, images):
+        a = time.time()
         masks = []
         for bgr in images:
             if bgr is not None:
                 try:
                     hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
-                    hue_min = self.HUE_MIN # yellowish
-                    hue_max = self.HUE_MAX # bluish
-                    sat_min = np.percentile(hsv[:,:,1], self.SAT_MIN) # cutoff for how saturated the color must be
-                    sat_max = np.percentile(hsv[:,:,1], self.SAT_MAX)
-                    val_min = np.percentile(hsv[:,:,2], self.VAL_MIN)
-                    val_max = np.percentile(hsv[:,:,2], self.VAL_MAX)
-                    threshold_min = np.array([hue_min, sat_min, val_min], np.uint8)
-                    threshold_max = np.array([hue_max, sat_max, val_max], np.uint8)
-                    mask = cv2.inRange(hsv, threshold_min, threshold_max)
+                    mask = cv2.inRange(hsv, self.threshold_min, self.threshold_max)
                     masks.append(mask)
                     if self.VERBOSE: pretty_print('CV', 'Mask Number #%d was successful' % len(masks))
                 except Exception as error:
                     pretty_print('CV', str(error))
             else:
-                masks.append(None)
                 if self.VERBOSE: pretty_print('CV', 'Mask Number #%d is blank' % len(masks))
+                masks.append(None)
+        b = time.time()
+        if self.VERBOSE: pretty_print('CV', 'plant_filter() ran in %f ms' % ((b - a) * 1000))
         return masks
         
     ## Find Plants
@@ -244,6 +243,7 @@ class AgriVision:
     5. Repeat for each mask
     """
     def find_offset(self, masks):
+        a = time.time()
         indices = []
         for mask in masks:
             if mask is not None:
@@ -263,6 +263,8 @@ class AgriVision:
                 except Exception as error:
                     pretty_print('CV', '%s' % str(error))
         if self.VERBOSE: pretty_print('CV', 'Detected indices: %s' % str(indices))
+        b = time.time()
+        if self.VERBOSE: pretty_print('CV', 'find_offset() ran in %f ms' % ((b - a) * 1000))
         return indices
         
     ## Best Guess for row based on multiple offsets from indices
@@ -274,6 +276,7 @@ class AgriVision:
     3. Estimate the weighted position of the crop row (in pixels)
     """
     def estimate_row(self, indices):
+        a = time.time()
         if self.VERBOSE: pretty_print('ROW', 'Estimating row ofset ...')
         try:
             est =  int(np.mean(indices))
@@ -289,6 +292,8 @@ class AgriVision:
             pretty_print('ROW', '(P) Estimated Offset: %s' % str(est))
             pretty_print('ROW', '(I) Moving Average: %s' % str(avg))
             pretty_print('ROW', '(D) Differential : %s' % str(diff))
+        b = time.time()
+        if self.VERBOSE: pretty_print('CV', 'estimate_row() ran in %f ms' % ((b - a) * 1000))
         return est, avg, diff
          
     ## Control Hydraulics
@@ -401,12 +406,17 @@ class AgriVision:
                         (h, w, d) = img.shape
                         if self.VERBOSE: pretty_print('DISP', 'Mask shape: %s' % str(mask.shape))
                         if self.VERBOSE: pretty_print('DISP', 'Img shape: %s' % str(img.shape))
-                        cv2.line(img, (self.PIXEL_MIN, 0), (self.PIXEL_MIN, self.CAMERA_HEIGHT), (0,0,255), 1)
-                        cv2.line(img, (self.PIXEL_MAX, 0), (self.PIXEL_MAX, self.CAMERA_HEIGHT), (0,0,255), 1)
-                        cv2.line(img, (average, 0), (average, self.CAMERA_HEIGHT), (0,255,0), 2)
-                        cv2.line(img, (self.CAMERA_CENTER, 0), (self.CAMERA_CENTER, self.CAMERA_HEIGHT), (255,255,255), 1)
-                        if self.HIGHLIGHT: img = img + np.dstack((100 * mask, 100 * mask, 0 *mask))
-                        if self.VERBOSE: pretty_print('DISP', 'Highlighted detected plants')
+                        if self.HIGHLIGHT:
+                            img = np.dstack((mask, mask, mask))
+                            img[:, self.PIXEL_MIN, 2] =  255
+                            img[:, self.PIXEL_MAX, 2] =  255
+                            img[:, self.CAMERA_CENTER, 1] =  255
+                            if self.VERBOSE: pretty_print('DISP', 'Highlighted detected plants')
+                        else:
+                            cv2.line(img, (self.PIXEL_MIN, 0), (self.PIXEL_MIN, self.CAMERA_HEIGHT), (0,0,255), 1)
+                            cv2.line(img, (self.PIXEL_MAX, 0), (self.PIXEL_MAX, self.CAMERA_HEIGHT), (0,0,255), 1)
+                            cv2.line(img, (average, 0), (average, self.CAMERA_HEIGHT), (0,255,0), 2)
+                            cv2.line(img, (self.CAMERA_CENTER, 0), (self.CAMERA_CENTER, self.CAMERA_HEIGHT), (255,255,255), 1)
                         output_images.append(img)
                     except Exception as error:
                         pretty_print('DISP', 'ERROR: %s' % str(error))
@@ -448,7 +458,8 @@ class AgriVision:
                 p = (int(q[0] + arrow_magnitude * np.cos(angle - np.pi/4)), # starting point of second line of arrow head 
                 int(q[1] + arrow_magnitude * np.sin(angle - np.pi/4)))
                 cv2.line(output_large, p, q, color, thickness, line_type, shift) # draw second half of arrow head
-
+                
+                # Draw GUI
                 cv2.namedWindow('Agri-Vision', cv2.WINDOW_NORMAL)
                 if self.FULLSCREEN: cv2.setWindowProperty('Agri-Vision', cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
                 if self.VERBOSE: pretty_print('DISP', 'Output shape: %s' % str(output_large.shape))
