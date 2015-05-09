@@ -76,10 +76,10 @@ class AgriVision:
             pretty_print('INIT', 'Image Center: %d px' % self.CAMERA_CENTER)
         self.GROUND_WIDTH = 2 * self.CAMERA_DEPTH * np.tan(self.CAMERA_FOV / 2.0)
         pretty_print('CAM', 'Ground Width: %d cm' % self.GROUND_WIDTH)
-        pretty_print('CAM', 'Brush Range: +/- %d cm' % self.BRUSH_RANGE)
+        pretty_print('CAM', 'Error Tolerance: +/- %d cm' % self.ERROR_TOLERANCE)
         self.PIXEL_PER_CM = self.CAMERA_WIDTH / self.GROUND_WIDTH
         pretty_print('CAM', 'Pixel-per-cm: %d px/cm' % self.PIXEL_PER_CM)
-        self.PIXEL_RANGE = int(self.PIXEL_PER_CM * self.BRUSH_RANGE) 
+        self.PIXEL_RANGE = int(self.PIXEL_PER_CM * self.ERROR_TOLERANCE) 
         pretty_print('CAM', 'Pixel Range: +/- %d px' % self.PIXEL_RANGE)
         self.PIXEL_MIN = self.CAMERA_CENTER - self.PIXEL_RANGE
         self.PIXEL_MAX = self.CAMERA_CENTER + self.PIXEL_RANGE 

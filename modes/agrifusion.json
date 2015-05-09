@@ -35,6 +35,6 @@
     "VERBOSE" : true,
     "MIN_VOLTAGE": 0.10,
     "MAX_VOLTAGE": 8.00,
-    "BRUSH_RANGE" : 6,
+    "ERROR_TOLERANCE" : 6,
     "HIGHLIGHT" : false
 }
