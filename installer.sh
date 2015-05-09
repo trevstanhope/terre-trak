@@ -55,6 +55,7 @@ apt-get install libxvidcore-dev -y -qq
 apt-get install x264 -y -qq
 apt-get install v4l-utils -y -qq
 apt-get install arduino arduino-mk -qq
+apt-get install x11-xserver-utils -y -qq
 
 # OpenCV Dependency Fix
 echo "Fix for AVformat"
