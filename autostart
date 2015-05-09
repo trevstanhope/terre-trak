@@ -2,4 +2,5 @@
 xset s noblank # don't blank the video device
 xset dpms force off # disable DPMS (Energy Star) features.
 xset s off # don't activate screensaver
+cd /root/agri-vision
 python agrivision.py
