@@ -9,5 +9,9 @@
 gpsd /dev/ttyS0
 #rmmod uvcvideo
 #modprobe uvcvideo nodrop=1 timeout=10 quirks=0x80
+cd /root/agri-vision
+git fetch --all
+git reset --hard HEAD
+git pull
 startx
 exit 0

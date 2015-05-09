@@ -1,8 +1,5 @@
 #!/bin/sh
 cd /root/agri-vision
-git fetch --all
-git reset --hard HEAD
-git pull
 xset s noblank # don't blank the video device
 #xset dpms force off # disable DPMS (Energy Star) features.
 xset s off # don't activate screensaver
