@@ -67,11 +67,13 @@ class AgriVision:
         pretty_print('CAM', 'Initializing CV Variables')
         if self.CAMERA_ROTATED:
             self.CAMERA_HEIGHT, self.CAMERA_WIDTH = self.CAMERA_WIDTH, self.CAMERA_HEIGHT # flip dimensions if rotated
+        self.CAMERA_CENTER = self.CAMERA_WIDTH / 2
         if self.VERBOSE:
+            pretty_print('CAM', 'Camera Width: %d px' % self.CAMERA_WIDTH)
             pretty_print('CAM', 'Camera Height: %d px' % self.CAMERA_HEIGHT)
+            pretty_print('CAM', 'Camera Center: %d px' % self.CAMERA_CENTER)
             pretty_print('CAM', 'Camera Depth: %d cm' % self.CAMERA_DEPTH)
             pretty_print('CAM', 'Camera FOV: %f rad' % self.CAMERA_FOV)
-        self.CAMERA_CENTER = self.CAMERA_WIDTH / 2
         if self.VERBOSE: 
             pretty_print('INIT', 'Image Center: %d px' % self.CAMERA_CENTER)
         self.GROUND_WIDTH = 2 * self.CAMERA_DEPTH * np.tan(self.CAMERA_FOV / 2.0)
@@ -210,7 +212,7 @@ class AgriVision:
                 images.append(None)
                 if self.VERBOSE: pretty_print('CAM', 'ERROR: Capture failed')
         b = time.time()
-        if self.VERBOSE: pretty_print('CAM', '... %f ms' % ((b - a) * 1000))
+        if self.VERBOSE: pretty_print('CAM', '... %.2f ms' % ((b - a) * 1000))
         return images
         
     ## Plant Segmentation Filter
@@ -221,6 +223,7 @@ class AgriVision:
     4. Take hues within range from green-yellow to green-blue
     """
     def plant_filter(self, images):
+        pretty_print('BPPD', 'Filtering for plants ...')
         a = time.time()
         masks = []
         for bgr in images:
@@ -229,19 +232,21 @@ class AgriVision:
                     hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
                     s_mean = hsv[:,:,1].mean()
                     v_mean = hsv[:,:,2].mean()
-                    self.threshold_min[1] = s_mean
-                    self.threshold_min[2] = v_mean 
-                    pretty_print('BPPD', 'S:%f, V:%f' % (s_mean, v_mean))
+                    self.threshold_min[1] = s_mean # overwrite the saturation minima
+                    self.threshold_min[2] = v_mean # overwrite the value minima
+                    pretty_print('BPPD', 'Smean = %.1f' % (s_mean))
+                    pretty_print('BPPD', 'Vmean = %.1f' % (v_mean))
                     mask = cv2.inRange(hsv, self.threshold_min, self.threshold_max)
                     masks.append(mask)
                     if self.VERBOSE: pretty_print('BPPD', 'Mask Number #%d was successful' % len(masks))
+                    
                 except Exception as error:
                     pretty_print('BPPD', str(error))
             else:
                 if self.VERBOSE: pretty_print('BPPD', 'Mask Number #%d is blank' % len(masks))
                 masks.append(None)
         b = time.time()
-        if self.VERBOSE: pretty_print('BPPD', '... %f ms' % ((b - a) * 1000))
+        if self.VERBOSE: pretty_print('BPPD', '... %.2f ms' % ((b - a) * 1000))
         return masks
         
     ## Find Plants
@@ -271,10 +276,10 @@ class AgriVision:
                     centroid = int(np.median(probable[0])) - self.CAMERA_CENTER
                     indices.append(centroid)
                 except Exception as error:
-                    pretty_print('CV', '%s' % str(error))
-        if self.VERBOSE: pretty_print('CV', 'Detected indices: %s' % str(indices))
+                    pretty_print('OFF', '%s' % str(error))
+        if self.VERBOSE: pretty_print('OFF', 'Detected indices: %s' % str(indices))
         b = time.time()
-        if self.VERBOSE: pretty_print('CV', '... %f ms' % ((b - a) * 1000))
+        if self.VERBOSE: pretty_print('OFF', '... %.2f ms' % ((b - a) * 1000))
         return indices
         
     ## Best Guess for row based on multiple offsets from indices
@@ -282,7 +287,7 @@ class AgriVision:
     1. If outside bounds, default to edges
     2. If inside, use mean of detected indices from both cameras
     1. Takes the current assumed offset and number of averages
-    2. Calculate weights of previous offsets
+    2. Calculate weights of previous offset
     3. Estimate the weighted position of the crop row (in pixels)
     """
     def estimate_row(self, indices):
@@ -297,13 +302,13 @@ class AgriVision:
         while len(self.offset_history) > self.NUM_AVERAGES:
             self.offset_history.pop(0)
         avg = int(np.mean(self.offset_history)) #!TODO
-        diff = est - avg #!TODO can be a little more clever
+        diff = est - avg #!TODO can be a little more clever e.g. np.gradient, np.convolve
         if self.VERBOSE:
-            pretty_print('ROW', '(P) Estimated Offset: %s' % str(est))
-            pretty_print('ROW', '(I) Moving Average: %s' % str(avg))
-            pretty_print('ROW', '(D) Differential : %s' % str(diff))
+            pretty_print('ROW', 'Est = %.2f' % est)
+            pretty_print('ROW', 'Avg = %.2f' % avg)
+            pretty_print('ROW', 'Diff.= %.2f' % diff)
         b = time.time()
-        if self.VERBOSE: pretty_print('ROW', '... %f ms' % ((b - a) * 1000))
+        if self.VERBOSE: pretty_print('ROW', '... %.2f ms' % ((b - a) * 1000))
         return est, avg, diff
          
     ## Control Hydraulics
@@ -320,19 +325,24 @@ class AgriVision:
             p = estimate * self.P_COEF
             i = average * self.I_COEF
             d = diff  * self.D_COEF
-            if self.VERBOSE: pretty_print('PID', str([p,i,d]))
+            if self.VERBOSE: pretty_print('PID', "P = %.1f" % p)
+            if self.VERBOSE: pretty_print('PID', "I = %.1f" % i)
+            if self.VERBOSE: pretty_print('PID', "D = %.1f" % d)            
             pwm = int(p + i + d + self.CENTER_PWM) # offset to zero
+            if pwm > self.PWM_MAX: pwm = self.PWM_MAX
+            elif pwm < self.PWM_MIN: pwm = self.PWM_MIN
+            volts = round((pwm * (self.MAX_VOLTAGE - self.MIN_VOLTAGE) / (self.PWM_MAX - self.PWM_MIN) + self.MIN_VOLTAGE), 2)
             if pwm > self.PWM_MAX:
                 pwm = self.PWM_MAX
             elif pwm < self.PWM_MIN:
                 pwm = self.PWM_MIN
-            if self.VERBOSE: pretty_print('PID', 'PWM Output: %s' % str(pwm))
+            if self.VERBOSE: pretty_print('PID', 'PWM = %d (%.2f V)' % (pwm, volts))
         except Exception as error:
             pretty_print('PID', 'ERROR: %s' % str(error))
             pwm = self.CENTER_PWM
         b = time.time()
-        if self.VERBOSE: pretty_print('PID', '... %f ms' % ((b - a) * 1000))
-        return pwm
+        if self.VERBOSE: pretty_print('PID', '... %.2f ms' % ((b - a) * 1000))
+        return pwm, volts
 
     ## Control Hydraulics
     """
@@ -352,7 +362,7 @@ class AgriVision:
         except Exception as error:
             pretty_print('CTRL', 'ERROR: %s' % str(error))
         b = time.time()
-        if self.VERBOSE: pretty_print('CTRL', '... %f ms' % ((b - a) * 1000))
+        if self.VERBOSE: pretty_print('CTRL', '... %.2f ms' % ((b - a) * 1000))
     
     ## Log to Mongo
     """
@@ -409,10 +419,10 @@ class AgriVision:
                 estimated = self.estimated  + self.CAMERA_CENTER
                 masks = self.masks
                 images = self.images
+                volts = self.volts
                 output_images = []
                 distance = round((average - self.CAMERA_CENTER) / float(self.PIXEL_PER_CM), 1)
                 if self.VERBOSE: pretty_print('DISP', 'Offset Distance: %d' % distance)
-                volts = round((pwm * (self.MAX_VOLTAGE - self.MIN_VOLTAGE) / (self.PWM_MAX - self.PWM_MIN) + self.MIN_VOLTAGE), 2)
                 for i in xrange(self.CAMERAS):
                     try:
                         if self.VERBOSE: pretty_print('DISP', 'Image #%d' % (i+1))
@@ -428,6 +438,7 @@ class AgriVision:
                             img[:, self.PIXEL_MIN, 2] =  255
                             img[:, self.PIXEL_MAX, 2] =  255
                             img[:, self.CAMERA_CENTER, 1] =  255
+                            img[:, average, 0] = 255
                             if self.VERBOSE: pretty_print('DISP', 'Highlighted detected plants')
                         else:
                             cv2.line(img, (self.PIXEL_MIN, 0), (self.PIXEL_MIN, self.CAMERA_HEIGHT), (0,0,255), 1)
@@ -487,7 +498,7 @@ class AgriVision:
                 pretty_print('DISP', str(error))
             self.updating = False
         b = time.time()
-        if self.VERBOSE: pretty_print('DISP', '... %f ms' % ((b - a) * 1000))
+        if self.VERBOSE: pretty_print('DISP', '... %.2f ms' % ((b - a) * 1000))
                     
     ## Update GPS
     """
@@ -550,7 +561,7 @@ class AgriVision:
                 masks = self.plant_filter(images)
                 offsets = self.find_offset(masks)
                 (est, avg, diff) = self.estimate_row(offsets)
-                pwm = self.calculate_output(est, avg, diff)
+                pwm, volts = self.calculate_output(est, avg, diff)
                 err = self.set_controller(pwm)
                 sample = {
                     'offsets' : offsets, 
@@ -568,6 +579,7 @@ class AgriVision:
                 self.masks = masks
                 self.average = avg
                 self.estimated = est
+                self.volts = volts
                 if self.MONGO_ON: doc_id = self.log_db(sample)
                 if self.LOGFILE_ON: self.log_file(sample)
                 if self.DISPLAY_ON: thread.start_new_thread(self.update_display, ())
