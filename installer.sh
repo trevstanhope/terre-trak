@@ -4,6 +4,20 @@
 # DISCLAIMER: This software is distributed with no warranty.
 
 INSTALL_PATH=/root/agri-vision
+cd $INSTALL_PATH
+
+# Settings File
+read -p "Create settings.cfg [y/n]? " ans
+if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
+    then
+        read -p "Enter the relative path to the settings file: " ans
+        echo $ans > settings.cfg
+fi
+if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
+    then
+        echo "Aborting..."
+fi
+
 
 # LightDM
 read -p "Do you want to disable LightDM [y/n]? " ans
@@ -39,6 +53,7 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
         cd $INSTALL_PATH
         cp bin/rc.local /etc/
         chmod +x /etc/rc.local
+	cp configs/Agri-Vision.desktop /root/.config/autostart
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
@@ -165,5 +180,5 @@ if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
         echo "Aborting..."
 fi
 
-# s
+# Done Message
 echo "Installation Complete!"
