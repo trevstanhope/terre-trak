@@ -7,7 +7,7 @@
 # value on error.
 
 gpsd /dev/ttyS0 && echo "GPSD started succesfully"
-cd /root/agri-vision
+cd  /root/agri-vision
 git fetch --all && git reset --hard HEAD && git pull
 startx || python agrivision.py
 exit 0

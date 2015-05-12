@@ -7,7 +7,7 @@ IDEAS:
 - Rotation compensation --> take Hough Line of plants to estimate row angle
 """
 
-__author__ = 'Trevor Stanhope'
+__author__ = 'Tsevor Stanhope'
 __version__ = '2.01'
 
 ## Libraries
@@ -25,6 +25,7 @@ import time
 import sys
 from datetime import datetime
 import ast
+import os
 
 ## Constants
 try:
@@ -582,7 +583,12 @@ class AgriVision:
                 self.volts = volts
                 if self.MONGO_ON: doc_id = self.log_db(sample)
                 if self.LOGFILE_ON: self.log_file(sample)
-                if self.DISPLAY_ON: thread.start_new_thread(self.update_display, ())
+                if self.DISPLAY_ON:
+                    try:
+                        os.environ['DISPLAY']
+                        thread.start_new_thread(self.update_display, ())
+                    except Exception as error:
+                        pretty_print('SYS', 'ERROR: %s' % str(error))
             except KeyboardInterrupt as error:
                 self.close()    
                 break
