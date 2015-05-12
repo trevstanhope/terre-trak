@@ -167,7 +167,7 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
         ln -s ../libavformat/avformat.h avformat.h
         echo "Installing OpenCV ..."
         wget http://downloads.sourceforge.net/project/opencvlibrary/opencv-unix/2.4.9/opencv-2.4.9.zip -q
-        unzip opencv-2.4.9.zip -qq
+        unzip -qq opencv-2.4.9.zip
         cd opencv-2.4.9
         mkdir release
         cd release
