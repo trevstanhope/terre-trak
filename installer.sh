@@ -2,16 +2,15 @@
 # Rehydrate INSTALLER
 # WARNING: This software makes significant changes to the system behavior
 # DISCLAIMER: This software is distributed with no warranty.
-s
-INSTALL_PATH=pwd
+
+INSTALL_PATH=/root/agri-vision
 
 # LightDM
 read -p "Do you want to disable LightDM [y/n]? " ans
 if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
     then
         echo "Removing LightDM..."
-        update-rc.d -f lightdm remove
-        service lightdm remove
+        update-rc.d -f lightdm remove || service lightdm remove
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
@@ -87,10 +86,10 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
         apt-get install python-serial -y -qq
         apt-get install python-pip -y -qq
         apt-get install python-gps -y -qq # python dependencies
-        apt-get install mongodb -y -qq# MongoDB
+        apt-get install mongodb -y -qq # MongoDB
         apt-get install gpsd -y -qq
         apt-get install gpsd-clients -y -qq
-        apt-get install python-gps -y  -qq# GPS
+        apt-get install python-gps -y  -qq # GPS
         apt-get install python-matplotlib -y -qq
         apt-get install libgtk2.0-dev -y -qq
         apt-get install python-numpy -y -qq
