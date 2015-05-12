@@ -38,7 +38,7 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
     then
         echo "Installing to Boot Path..."
         cd $INSTALL_PATH
-        cp configs/rc.local /etc/
+        cp bin/rc.local /etc/
         chmod +x /etc/rc.local
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
