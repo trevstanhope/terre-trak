@@ -10,3 +10,11 @@ Multi-camera computer-vision guidance system for row-crop cultivators
 To install the system, simply run the install script:
     
     sh install.sh
+
+## Configure Asutostart launcher
+Open the Settings --> Session and Startup --> Application Autostart
+Add a new launcher named "AgriVision" and set the command to:
+
+    ./root/agri-vision/autostart &
+    
+IMPORTANT: Disable the Power Manager. This will maximize CPU usage and prevent screen blanking.

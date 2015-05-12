@@ -1,6 +1,5 @@
 /*
-  Agri-Vision
-  SunCo Adaptor
+  SunCo AcuTrak Adaptor
   Electro-Hydraulic PWM Controller
   Developed by Trevor Stanhope
   Receives serial commands to adjust the hydraulics
@@ -25,9 +24,9 @@ void setup(void) {
 
 /* --- Loop --- */
 void loop(void) {
-  DUTY = Serial.parseInt();
-  if (DUTY == 0) {
-    DUTY = PWM_MAX / 2;
+  int val = Serial.parseInt();
+  if (val != 0) {
+    DUTY = val;
   }
   analogWrite(OUTPUT_PIN, DUTY - 1);
 }
