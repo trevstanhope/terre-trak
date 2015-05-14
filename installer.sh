@@ -3,18 +3,35 @@
 # WARNING: This software makes significant changes to the system behavior
 # DISCLAIMER: This software is distributed with no warranty.
 
+<<<<<<< HEAD
 INSTALL_PATH="$PWD"
 CONFIG_PATH="$PWD/configs"
 BIN_PATH="$PWD/bin"
 SOURCE_PATH="$PWD/src"
+=======
+INSTALL_PATH=/root/agri-vision
+cd $INSTALL_PATH
+
+# Settings File
+read -p "Create settings.cfg [y/n]? " ans
+if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
+    then
+        read -p "Enter the relative path to the settings file: " ans
+        echo $ans > settings.cfg
+fi
+if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
+    then
+        echo "Aborting..."
+fi
+
+>>>>>>> 5f2910017257b9de8c976b53a13defc8c2ebc4b6
 
 # LightDM
 read -p "Do you want to disable LightDM [y/n]? " ans
 if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
     then
         echo "Removing LightDM..."
-        update-rc.d -f lightdm remove
-        service lightdm remove
+        update-rc.d -f lightdm remove || service lightdm remove
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
@@ -41,6 +58,7 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
         echo "Installing to Boot Path..."
         cp $BIN_PATH/rc.local /etc/
         chmod +x /etc/rc.local
+	cp configs/Agri-Vision.desktop /root/.config/autostart
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
@@ -87,10 +105,10 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
         apt-get install python-serial -y -qq
         apt-get install python-pip -y -qq
         apt-get install python-gps -y -qq # python dependencies
-        apt-get install mongodb -y -qq# MongoDB
+        apt-get install mongodb -y -qq # MongoDB
         apt-get install gpsd -y -qq
         apt-get install gpsd-clients -y -qq
-        apt-get install python-gps -y  -qq# GPS
+        apt-get install python-gps -y  -qq # GPS
         apt-get install python-matplotlib -y -qq
         apt-get install libgtk2.0-dev -y -qq
         apt-get install python-numpy -y -qq
@@ -166,5 +184,5 @@ if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
         echo "Aborting..."
 fi
 
-# s
+# Done Message
 echo "Installation Complete!"
