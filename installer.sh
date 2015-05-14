@@ -3,14 +3,10 @@
 # WARNING: This software makes significant changes to the system behavior
 # DISCLAIMER: This software is distributed with no warranty.
 
-<<<<<<< HEAD
 INSTALL_PATH="$PWD"
 CONFIG_PATH="$PWD/configs"
 BIN_PATH="$PWD/bin"
 SOURCE_PATH="$PWD/src"
-=======
-INSTALL_PATH=/root/agri-vision
-cd $INSTALL_PATH
 
 # Settings File
 read -p "Create settings.cfg [y/n]? " ans
@@ -23,8 +19,6 @@ if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
         echo "Aborting..."
 fi
-
->>>>>>> 5f2910017257b9de8c976b53a13defc8c2ebc4b6
 
 # LightDM
 read -p "Do you want to disable LightDM [y/n]? " ans
@@ -154,7 +148,7 @@ read -p "Update Pip modules? [y/n] " ans
 if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
     then
         echo "Installing Python modules..."
-        pip install pymongo
+        pip install -r requirements.txt
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
