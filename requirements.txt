@@ -1,0 +1,2 @@
+pymongo==2.8
+pyzmq==2.2.0

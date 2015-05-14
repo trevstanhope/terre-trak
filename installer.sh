@@ -2,8 +2,11 @@
 # Rehydrate INSTALLER
 # WARNING: This software makes significant changes to the system behavior
 # DISCLAIMER: This software is distributed with no warranty.
-s
-INSTALL_PATH=pwd
+
+INSTALL_PATH="$PWD"
+CONFIG_PATH="$PWD/configs"
+BIN_PATH="$PWD/bin"
+SOURCE_PATH="$PWD/src"
 
 # LightDM
 read -p "Do you want to disable LightDM [y/n]? " ans
@@ -23,9 +26,8 @@ read -p "Disable on-screen mouse [y/n]? " ans
 if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
     then     
         echo "Disabling Mouse ..."
-        cd $INSTALL_PATH
         apt-get install unclutter
-        cp configs/unclutter /etc/default/
+        cp $CONFIG_PATH/unclutter /etc/default/
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
@@ -37,8 +39,7 @@ read -p "Start AgriVision on boot? [y/n] " ans
 if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
     then
         echo "Installing to Boot Path..."
-        cd $INSTALL_PATH
-        cp bin/rc.local /etc/
+        cp $BIN_PATH/rc.local /etc/
         chmod +x /etc/rc.local
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
@@ -51,8 +52,7 @@ read -p "Enable fast GRUB? [y/n] " ans
 if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
     then
         echo "Updating Custom Grub..."
-        cd $INSTALL_PATH
-        cp configs/grub /etc/default
+        cp $CONFIG_PATH/grub /etc/default
         update-grub
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
@@ -65,8 +65,8 @@ read -p "Setup default network? [y/n] " ans
 if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
     then
         echo "Reconfiguring Network Interfaces..."
-        cd $INSTALL_PATH
-        cp configs/interfaces /etc/network
+        cp $CONFIG_PATH/interfaces /etc/network
+        cp $CONFIG_PATH/dhclient.conf /etc/dhcp
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
@@ -152,7 +152,7 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
         ln -s ../libv4l1-videodev.h videodev.h
         ln -s ../libavformat/avformat.h avformat.h
         echo "Installing OpenCV ..."
-        wget http://downloads.sourceforge.net/project/opencvlibrary/opencv-unix/2.4.9/opencv-2.4.9.zip -q
+        cd $SOURCE_PATH
         unzip opencv-2.4.9.zip -qq
         cd opencv-2.4.9
         mkdir release

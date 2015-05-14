@@ -1,6 +1,6 @@
 {
     "DEBUG" : false,
-    "PWM_MIN" : 0,
+    "PWM_MIN" : 1,
     "PWM_MAX" : 255,
     "DISPLAY_WIDTH" : 1024,
     "DISPLAY_HEIGHT" : 768,
