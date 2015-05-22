@@ -16,9 +16,8 @@ const unsigned int PWM_MIN = 0; // AnalogWrite(0) == 0% PWM
 const unsigned int PWM_MAX = 210; // AnalogWrite(255) == 100% PWM
 
 /* --- Variables --- */
-int DUTY = 127; // effective range of 0 to 255
-int PWM_CONTROL = (PWM_MAX + PWM_MIN) / 2;
-int PWM_REFERENCE = PWM_MAX;
+int pwm_control = (PWM_MAX + PWM_MIN) / 2;
+int pwm_reference = PWM_MAX;
 
 void setup(void) {
     pinMode(CONTROL_PIN, OUTPUT);
@@ -28,8 +27,9 @@ void setup(void) {
 
 void loop(void) {
     int val = Serial.parseInt();
-    PWM_CONTROL = map(val, 0, RESOLUTION, PWM_MIN, PWM_MAX);
-    PWM_REFERENCE = PWM_MAX; 
-    analogWrite(CONTROL_PIN, PWM_CONTROL);
-    analogWrite(REFERENCE_PIN, PWM_REFERENCE);
+    pwm_control = map(val, 0, RESOLUTION, PWM_MIN, PWM_MAX);
+    if (pwm_control > PWM_MAX) { pwm_control = PWM_MAX; }
+    if (pwm_control < PWM_MIN) { pwm_control = PWM_MIN; }
+    analogWrite(CONTROL_PIN, pwm_control);
+    analogWrite(REFERENCE_PIN, pwm_reference);
 }
