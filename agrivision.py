@@ -7,7 +7,7 @@ IDEAS:
 - Rotation compensation --> take Hough Line of plants to estimate row angle
 """
 
-__author__ = 'Tsevor Stanhope'
+__author__ = 'Trevor Stanhope'
 __version__ = '2.01'
 
 ## Libraries
@@ -109,8 +109,8 @@ class AgriVision:
                     cam.set(cv.CV_CAP_PROP_FRAME_WIDTH, self.CAMERA_HEIGHT)
                     cam.set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.CAMERA_WIDTH)
                 (s, bgr) = cam.read()
-		self.images[i] = bgr
-		self.cameras[i] = cam
+                self.images[i] = bgr
+                self.cameras[i] = cam
                 self.pretty_print('CAM', 'Camera #%d OK' % i)
             except Exception as error:
                 self.pretty_print('CAM', 'ERROR: %s' % str(error))
@@ -165,8 +165,10 @@ class AgriVision:
         try:
             self.pretty_print('CTRL', 'Device: %s' % str(self.SERIAL_DEVICE))
             self.pretty_print('CTRL', 'Baud Rate: %s' % str(self.SERIAL_BAUD))
-            self.controller = serial.Serial(self.SERIAL_DEVICE, self.SERIAL_BAUD)
-            pretty_print('CTRL', 'Setup OK')
+            self.controller = serial.Serial(self.SERIAL_DEVICE, self.SERIAL_BAUD, timeout=0.05)
+            self.controller.flushInput()
+	    self.controller.flushOutput()
+            self.pretty_print('CTRL', 'Setup OK')
         except Exception as error:
             self.pretty_print('CTRL', 'ERROR: %s' % str(error))
         
@@ -209,27 +211,31 @@ class AgriVision:
         self.pretty_print('CAM', 'Capturing Images ...')
         images = []
         for i in range(self.CAMERAS):
-	    cam = self.cameras[i]
-            self.pretty_print('CAM', 'Attempting on cam ID: %s' % str(cam))
+            self.pretty_print('CAM', 'Attempting on Camera #%d' % i)
             try:
-		(s, bgr) = cam.read()
-                if s or (self.images[i] is not None):
-		    if bgr.shape != (self.CAMERA_WIDTH, self.CAMERA_HEIGHT, 3):
-			output_large = bgr = cv2.resize(bgr, (self.CAMERA_HEIGHT, self.CAMERA_WIDTH))
+                (s, bgr) = self.cameras[i].read()
+                if s and (self.images[i] is not None):
+                    if bgr.shape != (self.CAMERA_WIDTH, self.CAMERA_HEIGHT, 3):
+                        bgr = cv2.resize(bgr, (self.CAMERA_HEIGHT, self.CAMERA_WIDTH))
                     if self.CAMERA_ROTATED: bgr = self.rotate_image(bgr)
                     if np.all(bgr==self.images[i]):
-		        images.append(None)
-		    else:
-			images.append(bgr)
-                    self.pretty_print('CAM', 'Capture successful: %s' % str(bgr.shape))
+                        images.append(None)
+                        self.pretty_print('CAM', 'ERROR: Frozen frame')
+                    else:
+                        self.pretty_print('CAM', 'Capture successful: %s' % str(bgr.shape))
+                        images.append(bgr)
                 else:
-                    images.append(None)
-	            cam.release()
-	            self.cameras[i]=cv2.VideoCapture(i)
                     self.pretty_print('CAM', 'ERROR: Capture failed')
+                    self.cameras[i].release()
+                    self.cameras[i] = cv2.VideoCapture(i)
+                    (s, bgr) = self.cameras[i].read()
+                    if s:
+                        images.append(bgr)
+                    else:
+                        images.append(None)
             except:
-		images.append(None)
-	b = time.time()
+                images.append(None)
+        b = time.time()
         self.pretty_print('CAM', '... %.2f ms' % ((b - a) * 1000))
         return images
         
@@ -372,15 +378,16 @@ class AgriVision:
     def set_controller(self, pwm):
         a = time.time()
         self.pretty_print('CTRL', 'Setting controller state ...')
-        try:            
-            try:
-                assert self.controller is not None
-                self.controller.write(str(pwm) + '\n') # Write to PWM adaptor
-                self.pretty_print('CTRL', 'Wrote successfully')
-            except Exception as error:
-                self.pretty_print('CTRL', 'ERROR: %s' % str(error))
+        try:
+            assert self.controller is not None
+	    self.controller.flushOutput()
+            self.controller.write(str(pwm) + '\n') # Write to PWM adaptor
+            self.pretty_print('CTRL', 'Wrote successfully')
+            duty = self.controller.readline()
+	    self.pretty_print('CTRL', 'Feedback: %s' % duty)
         except Exception as error:
             self.pretty_print('CTRL', 'ERROR: %s' % str(error))
+            self.reset_controller()
         b = time.time()
         self.pretty_print('CTRL', '... %.2f ms' % ((b - a) * 1000))
     
@@ -449,6 +456,7 @@ class AgriVision:
                     except Exception as error:
                         self.pretty_print('DISP', 'ERROR: %s' % str(error))
                 self.pretty_print('DISP', 'Stacking images ...')
+		for i in output_images: self.pretty_print('DISP', i.shape)
                 output_small = np.hstack(output_images)
                 pad = np.zeros((self.CAMERA_HEIGHT * 0.1, self.CAMERAS * self.CAMERA_WIDTH, 3), np.uint8) # add blank space
                 output_padded = np.vstack([output_small, pad])
@@ -513,6 +521,20 @@ class AgriVision:
             self.longitude = self.gpsd.fix.longitude
             self.speed = self.gpsd.fix.speed
             self.pretty_print('GPS', '%d N %d E' % (self.latitude, self.longitude))
+    
+    """
+    Reset Controller
+    """
+    def reset_controller(self):
+        self.pretty_print('SYSTEM', 'Resetting Controller ...')
+        try:
+	    self.controller.close()
+	except Exception as error:
+	    self.pretty_print('CTRL', 'ERROR: %s' % str(error))
+        try:
+            self.controller = serial.Serial(self.SERIAL_DEVICE, self.SERIAL_BAUD, timeout=0.05)
+        except Exception as error:
+            self.pretty_print('CTRL', 'ERROR: %s' % str(error))
     
     ## Close
     """

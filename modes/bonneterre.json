@@ -28,7 +28,7 @@
     "MONGO_FORMAT": "%Y_%m_%d",
     "TIME_FORMAT" : "%Y-%m-%d %H:%M:%S.%f",
     "LOG_FORMAT" : "%Y_%m_%d_%H_%M_%S",
-    "LOGFILE_ON" : false,
+    "LOGFILE_ON" : true,
     "MONGO_ON" : false,
     "DISPLAY_ON" : true,
     "GPS_ENABLED" : false,

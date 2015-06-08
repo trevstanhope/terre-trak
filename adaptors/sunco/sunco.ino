@@ -55,5 +55,7 @@ void loop(void) {
     if (duty > PWM_MAX) { duty = PWM_MAX; } // over-limit
     if (duty < PWM_MIN) { duty = PWM_MIN; } // under-limit (also handles no match
     analogWrite(OUTPUT_PIN, duty); // write to pwm output
+    Serial.println(duty);
+    Serial.flush();
   }
 }
