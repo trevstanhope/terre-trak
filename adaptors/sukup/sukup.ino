@@ -32,4 +32,6 @@ void loop(void) {
     if (pwm_control < PWM_MIN) { pwm_control = PWM_MIN; }
     analogWrite(CONTROL_PIN, pwm_control);
     analogWrite(REFERENCE_PIN, pwm_reference);
+    Serial.println(pwm_control);
+    Serial.flush();
 }
