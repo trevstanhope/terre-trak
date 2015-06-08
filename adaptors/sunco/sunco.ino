@@ -10,15 +10,15 @@
 */
 
 /* --- Pin Definitions --- */
-#define CALIBRATE_PIN 4
+#define CALIBRATE_PIN 13
 #define OUTPUT_PIN 5
 
 /* --- Constants --- */
 const unsigned long BAUD = 9600;
 const unsigned int RESOLUTION = 255;
-const unsigned int PWM_MIN = 69; // 1.25 V
-const unsigned int PWM_MAX = 211; // 3.75 V
-const unsigned int CALIBRATION_DELAY = 10; // ms for each voltage interval
+const unsigned int PWM_MIN = 78; // 1.25 V
+const unsigned int PWM_MAX = 178; // 3.75 V
+const unsigned int CALIBRATION_DELAY = 20; // ms for each voltage interval
 
 /* --- Variables --- */
 int duty = (PWM_MAX + PWM_MIN) / 2; // start at zero of effective range from PWM_MIN to PWM_MAX
@@ -35,6 +35,7 @@ void loop(void) {
   
   // Parse serial input
   int val = Serial.parseInt();
+  if (val == 0) { val = 128; }
   
   // Run calibrate sequence if the blue button is pressed
   if (!digitalRead(CALIBRATE_PIN)) {
