@@ -383,8 +383,8 @@ class AgriVision:
 	    self.controller.flushOutput()
             self.controller.write(str(pwm) + '\n') # Write to PWM adaptor
             self.pretty_print('CTRL', 'Wrote successfully')
-            duty = self.controller.readline()
-	    self.pretty_print('CTRL', 'Feedback: %s' % duty)
+            duty = int(self.controller.readline()) # try to cast the duty returned to int, if this fails the connection is hanging
+            self.pretty_print('CTRL', 'Feedback: %d' % duty)
         except Exception as error:
             self.pretty_print('CTRL', 'ERROR: %s' % str(error))
             self.reset_controller()
