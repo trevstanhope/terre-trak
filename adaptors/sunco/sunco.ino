@@ -1,4 +1,4 @@
-/*
+  
   SunCo AcuTrak Adaptor
   Electro-Hydraulic PWM Controller
   Developed by Trevor Stanhope
@@ -13,12 +13,12 @@
 #define CALIBRATE_PIN 13
 #define OUTPUT_PIN 5
 
-/* --- Constants --- */
+/* --- Constants --- */ 
 const unsigned long BAUD = 9600;
 const unsigned int RESOLUTION = 255;
-const unsigned int PWM_MIN = 78; // 1.25 V
-const unsigned int PWM_MAX = 178; // 3.75 V
-const unsigned int CALIBRATION_DELAY = 20; // ms for each voltage interval
+const unsigned int PWM_MIN = 68; // 1.25 V + 4 bits = 1.33 V
+const unsigned int PWM_MAX = 188; // 3.75 V - 4 bits = 1.69 V
+const unsigned int CALIBRATION_DELAY = 50; // ms for each voltage interval
 
 /* --- Variables --- */
 int duty = (PWM_MAX + PWM_MIN) / 2; // start at zero of effective range from PWM_MIN to PWM_MAX
@@ -39,14 +39,11 @@ void loop(void) {
   
   // Run calibrate sequence if the blue button is pressed
   if (!digitalRead(CALIBRATE_PIN)) {
-    for (int i = PWM_MIN; i < PWM_MAX; i++) {
-      analogWrite(OUTPUT_PIN, i);
-      delay(CALIBRATION_DELAY);
-    }
-    for (int i = PWM_MAX; i > PWM_MIN; i--) {
-      analogWrite(OUTPUT_PIN, i);
-      delay(CALIBRATION_DELAY);
-    }
+     analogWrite(OUTPUT_PIN, i);
+     delay(CALIBRATION_DELAY);
+     analogWrite(OUTPUT_PIN, i);
+     delay(CALIBRATION_DELAY);
+     duty = 128;
   }
   
   // Otherwise use convert the value read over serial to PWM range 
@@ -55,7 +52,7 @@ void loop(void) {
     if (duty > PWM_MAX) { duty = PWM_MAX; } // over-limit
     if (duty < PWM_MIN) { duty = PWM_MIN; } // under-limit (also handles no match
     analogWrite(OUTPUT_PIN, duty); // write to pwm output
-    Serial.println(duty);
-    Serial.flush();
   }
+  Serial.println(duty);
+  Serial.flush();
 }

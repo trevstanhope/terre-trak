@@ -215,8 +215,6 @@ class AgriVision:
             try:
                 (s, bgr) = self.cameras[i].read()
                 if s and (self.images[i] is not None):
-                    if bgr.shape != (self.CAMERA_WIDTH, self.CAMERA_HEIGHT, 3):
-                        bgr = cv2.resize(bgr, (self.CAMERA_HEIGHT, self.CAMERA_WIDTH))
                     if self.CAMERA_ROTATED: bgr = self.rotate_image(bgr)
                     if np.all(bgr==self.images[i]):
                         images.append(None)
@@ -233,6 +231,8 @@ class AgriVision:
                         images.append(bgr)
                     else:
                         images.append(None)
+            except KeyboardInterrupt:
+                raise KeyboardInterrupt
             except:
                 images.append(None)
         b = time.time()
@@ -263,7 +263,8 @@ class AgriVision:
                     mask = cv2.inRange(hsv, self.threshold_min, self.threshold_max)
                     masks.append(mask)
                     self.pretty_print('BPPD', 'Mask Number #%d was successful' % len(masks))
-                    
+                except KeyboardInterrupt:
+                    raise KeyboardInterrupt
                 except Exception as error:
                     self.pretty_print('BPPD', str(error))
             else:
@@ -299,6 +300,8 @@ class AgriVision:
                     num_probable = len(probable[0])
                     centroid = int(np.median(probable[0])) - self.CAMERA_CENTER
                     indices.append(centroid)
+                except KeyboardInterrupt:
+                    raise KeyboardInterrupt
                 except Exception as error:
                     self.pretty_print('OFF', '%s' % str(error))
             else:
@@ -363,6 +366,8 @@ class AgriVision:
             elif pwm < self.PWM_MIN:
                 pwm = self.PWM_MIN
             self.pretty_print('PID', 'PWM = %d (%.2f V)' % (pwm, volts))
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
         except Exception as error:
             pretty_print('PID', 'ERROR: %s' % str(error))
             pwm = self.CENTER_PWM
@@ -380,11 +385,16 @@ class AgriVision:
         self.pretty_print('CTRL', 'Setting controller state ...')
         try:
             assert self.controller is not None
-	    self.controller.flushOutput()
+            self.controller.flushOutput()
             self.controller.write(str(pwm) + '\n') # Write to PWM adaptor
             self.pretty_print('CTRL', 'Wrote successfully')
-            duty = int(self.controller.readline()) # try to cast the duty returned to int, if this fails the connection is hanging
-            self.pretty_print('CTRL', 'Feedback: %d' % duty)
+            duty = self.controller.readline() # try to cast the duty returned to int, if this fails the connection is hanging
+            if duty == '':
+                while duty == '':
+                    sduty = self.controller.readline()
+            self.pretty_print('CTRL', 'Feedback: %d' % int(duty))
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
         except Exception as error:
             self.pretty_print('CTRL', 'ERROR: %s' % str(error))
             self.reset_controller()
@@ -402,6 +412,8 @@ class AgriVision:
             assert self.collection is not None
             doc_id = self.collection.insert(sample)
             self.pretty_print('DB', 'Doc ID: %s' % str(doc_id))
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
         except Exception as error:
             self.pretty_print('DB', 'ERROR: %s' % str(error))
         return doc_id
@@ -453,14 +465,16 @@ class AgriVision:
                             cv2.line(img, (average, 0), (average, self.CAMERA_HEIGHT), (0,255,0), 2)
                             cv2.line(img, (self.CAMERA_CENTER, 0), (self.CAMERA_CENTER, self.CAMERA_HEIGHT), (255,255,255), 1)
                         output_images.append(img)
+                    except KeyboardInterrupt:
+                        raise KeyboardInterrupt
                     except Exception as error:
                         self.pretty_print('DISP', 'ERROR: %s' % str(error))
                 self.pretty_print('DISP', 'Stacking images ...')
-		for i in output_images: self.pretty_print('DISP', i.shape)
                 output_small = np.hstack(output_images)
+                self.pretty_print('DISP', 'Padding images ...')
                 pad = np.zeros((self.CAMERA_HEIGHT * 0.1, self.CAMERAS * self.CAMERA_WIDTH, 3), np.uint8) # add blank space
                 output_padded = np.vstack([output_small, pad])
-                self.pretty_print('DISP', 'Padded image')
+                self.pretty_print('DISP', 'Resizing output ...')
                 output_large = cv2.resize(output_padded, (self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT))
 
                 # Offset Distance
@@ -502,6 +516,8 @@ class AgriVision:
                 cv2.imshow('Agri-Vision', output_large)
                 if cv2.waitKey(5) == 0:
                     pass
+            except KeyboardInterrupt:
+                raise KeyboardInterrupt
             except Exception as error:
                 self.pretty_print('DISP', str(error))
             self.updating = False
