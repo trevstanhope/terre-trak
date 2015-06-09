@@ -11,7 +11,7 @@
     "CAMERA_HEIGHT" : 480,
     "CAMERA_FOV": 0.6,
     "CAMERA_DEPTH": 100,
-    "CAMERA_ROTATED" : false,
+    "CAMERA_ROTATED" : true,
     "HUE_MIN" : 30, 
     "HUE_MAX" : 60, 
     "SAT_MIN" : 128,
