@@ -5,4 +5,4 @@ xset s noblank & # don't blank the video device
 xset s off & # don't activate screensaver
 xset -dpms &
 xset dpms force on # disable DPMS (Energy Star) features.
-python agrivision.py
+python terretrak.py

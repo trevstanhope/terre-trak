@@ -1,5 +1,5 @@
 #!/bin/sh
-# Rehydrate INSTALLER
+# INSTALLER
 # WARNING: This software makes significant changes to the system behavior
 # DISCLAIMER: This software is distributed with no warranty.
 
@@ -46,13 +46,13 @@ if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
 fi
 
 # Boot
-read -p "Start AgriVision on boot? [y/n] " ans
+read -p "Start application on boot? [y/n] " ans
 if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
     then
         echo "Installing to Boot Path..."
         cp $BIN_PATH/rc.local /etc/
         chmod +x /etc/rc.local
-	cp configs/Agri-Vision.desktop /root/.config/autostart
+	cp configs/Terre-Trak.desktop /root/.config/autostart
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
