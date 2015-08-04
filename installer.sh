@@ -7,6 +7,7 @@ INSTALL_PATH="$PWD"
 CONFIG_PATH="$PWD/configs"
 BIN_PATH="$PWD/bin"
 SOURCE_PATH="$PWD/src"
+echo "APP_PATH=$INSTALL_PATH" >> /etc/environment
 
 # Settings File
 read -p "Create settings.cfg [y/n]? " ans
@@ -52,7 +53,7 @@ if [ $ans = y -o $ans = Y -o $ans = yes -o $ans = Yes -o $ans = YES ]
         echo "Installing to Boot Path..."
         cp $BIN_PATH/rc.local /etc/
         chmod +x /etc/rc.local
-    cp configs/Terre-Trak.desktop /root/.config/autostart
+    cp configs/app.desktop /root/.config/autostart
 fi
 if [ $ans = n -o $ans = N -o $ans = no -o $ans = No -o $ans = NO ]
     then
