@@ -1,8 +1,11 @@
 #!/bin/sh
 # This script navigates to the AgriVision PATH, forces the screen to remain on, and starts the app
-cd /root/agri-vision
+
+APP_PATH='/root/agri-vision'
+
+cd $APP_PATH
 xset s noblank & # don't blank the video device
 xset s off & # don't activate screensaver
 xset -dpms &
 xset dpms force on # disable DPMS (Energy Star) features.
-python agrivision.py
+python app.py

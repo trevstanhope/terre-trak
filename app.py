@@ -34,7 +34,7 @@ except Exception as err:
     CONFIG_FILE = settings.rstrip()
 
 ## Class
-class AgriVision:
+class Application:
 
     def pretty_print(self, task, msg, *args):
         try:
@@ -611,5 +611,5 @@ class AgriVision:
 
 ## Main
 if __name__ == '__main__':
-    session = AgriVision(CONFIG_FILE)
+    session = Application(CONFIG_FILE)
     session.run()
