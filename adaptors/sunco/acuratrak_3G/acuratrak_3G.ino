@@ -1,12 +1,11 @@
-  
-  SunCo AcuTrak Adaptor
+/*  
+  SunCo AcuTrak Adaptor (Version 1)
   Electro-Hydraulic PWM Controller
   Developed by Trevor Stanhope
   Receives serial commands to adjust the hydraulics or run calibration sweep
   
   Calibration Momentary Switch Wiring:
   VCC --> 20KOhm Internal Pullup Resistor --> Input Pin
-  
 */
 
 /* --- Pin Definitions --- */

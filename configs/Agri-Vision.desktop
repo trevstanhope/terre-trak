@@ -2,9 +2,9 @@
 Encoding=UTF-8
 Version=0.9.4
 Type=Application
-Name=Terre-Trak
+Name=Agri-Vision
 Comment=
-Exec=/root/terre-trak/autostart &
+Exec=/root/agri-vision/autostart &
 StartupNotify=false
 Terminal=false
 Hidden=false

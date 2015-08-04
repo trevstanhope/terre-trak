@@ -1,8 +1,10 @@
 """
-Terre-Trak
+Agri-Vision
 Precision Agriculture and Soil Sensing Group (PASS)
 McGill University, Department of Bioresource Engineering
 
+IDEAS:
+- Rotation compensation --> take Hough Line of plants to estimate row angle
 """
 
 __author__ = 'Trevor Stanhope'
@@ -16,7 +18,6 @@ from bson import json_util
 from pymongo import MongoClient
 import json
 import numpy as np
-from matplotlib import pyplot as plt
 import thread
 import gps
 import time 
@@ -33,7 +34,7 @@ except Exception as err:
     CONFIG_FILE = settings.rstrip()
 
 ## Class
-class TerreTrak:
+class AgriVision:
 
     def pretty_print(self, task, msg, *args):
         try:
@@ -62,7 +63,7 @@ class TerreTrak:
         self.init_pid()
         self.init_db()
         self.init_gps()
-        if self.DISPLAY_ON: self.init_display()
+        self.init_display()
         
     # Initialize Cameras
     def init_cameras(self):
@@ -100,15 +101,15 @@ class TerreTrak:
             try:
                 self.pretty_print('CAM', 'Attaching Camera #%d' % i)
                 cam = cv2.VideoCapture(i)
-                if not self.CAMERA_ROTATED:
-                    cam.set(cv.CV_CAP_PROP_FRAME_WIDTH, self.CAMERA_WIDTH)
-                    cam.set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.CAMERA_HEIGHT)
-                else:
-                    cam.set(cv.CV_CAP_PROP_FRAME_WIDTH, self.CAMERA_HEIGHT)
-                    cam.set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.CAMERA_WIDTH)
+                cam.set(cv.CV_CAP_PROP_SATURATION, self.CAMERA_SATURATION)
+                cam.set(cv.CV_CAP_PROP_CONTRAST, self.CAMERA_CONTRAST)
+                cam.set(cv.CV_CAP_PROP_BRIGHTNESS, self.CAMERA_BRIGHTNESS)
+             	cam.set(cv.CV_CAP_PROP_FRAME_WIDTH, self.CAMERA_WIDTH)
+                cam.set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.CAMERA_HEIGHT)
                 (s, bgr) = cam.read()
-                self.images[i] = bgr
-                self.cameras[i] = cam
+                if s:
+                    self.images[i] = bgr
+		self.cameras[i] = cam
                 self.pretty_print('CAM', 'Camera #%d OK' % i)
             except Exception as error:
                 self.pretty_print('CAM', 'ERROR: %s' % str(error))
@@ -187,12 +188,14 @@ class TerreTrak:
     # Display
     def init_display(self):
         self.pretty_print('INIT', 'Initializing Display')
-        try:
-            self.updating = False
-            if self.DISPLAY_ON:
+        if self.DISPLAY_ON:
+            try:
+                os.environ['DISPLAY']
                 thread.start_new_thread(self.update_display, ())
-        except Exception as error:
-            pretty_print('DISP', 'ERROR: %s' % str(error))
+            except Exception as error:
+                self.pretty_print('SYS', 'ERROR: %s' % str(error))
+            except Exception as error:
+                pretty_print('DISP', 'ERROR: %s' % str(error))
 
     ## Rotate image
     def rotate_image(self, bgr):
@@ -224,13 +227,16 @@ class TerreTrak:
                     self.pretty_print('CAM', 'ERROR: Capture failed')
                     self.cameras[i].release()
                     self.cameras[i] = cv2.VideoCapture(i)
+                    self.cameras[i].set(cv.CV_CAP_PROP_SATURATION, self.CAMERA_SATURATION)
+		    self.cameras[i].set(cv.CV_CAP_PROP_CONTRAST, self.CAMERA_CONTRAST)
+                    self.cameras[i].set(cv.CV_CAP_PROP_BRIGHTNESS, self.CAMERA_BRIGHTNESS)
+             	    self.cameras[i].set(cv.CV_CAP_PROP_FRAME_WIDTH, self.CAMERA_WIDTH)
+                    self.cameras[i].set(cv.CV_CAP_PROP_FRAME_HEIGHT, self.CAMERA_HEIGHT)
                     (s, bgr) = self.cameras[i].read()
                     if s:
                         images.append(bgr)
                     else:
                         images.append(None)
-            except KeyboardInterrupt:
-                raise KeyboardInterrupt
             except:
                 images.append(None)
         b = time.time()
@@ -252,17 +258,15 @@ class TerreTrak:
             if bgr is not None:
                 try:
                     hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
-                    s_mean = hsv[:,:,1].mean()
-                    v_mean = hsv[:,:,2].mean()
+                    s_mean = np.mean(hsv[:,:,1])
+                    v_mean = np.mean(hsv[:,:,2])
                     self.threshold_min[1] = s_mean # overwrite the saturation minima
                     self.threshold_min[2] = v_mean # overwrite the value minima
                     self.pretty_print('BPPD', 'Smean = %.1f' % (s_mean))
                     self.pretty_print('BPPD', 'Vmean = %.1f' % (v_mean))
-                    mask = cv2.inRange(hsv, self.threshold_min, self.threshold_max)
-                    masks.append(mask)
-                    self.pretty_print('BPPD', 'Mask Number #%d was successful' % len(masks))
-                except KeyboardInterrupt:
-                    raise KeyboardInterrupt
+                    mask = np.ceil(cv2.inRange(hsv, self.threshold_min, self.threshold_max) / 255.0)
+		    masks.append(mask)
+                    self.pretty_print('BPPD', 'Mask Number #%d was successful' % len(masks))                    
                 except Exception as error:
                     self.pretty_print('BPPD', str(error))
             else:
@@ -283,31 +287,29 @@ class TerreTrak:
     def find_offset(self, masks):
         a = time.time()
         indices = []
+        sums = []
         for mask in masks:
             if mask is not None:
                 try:
                     column_sum = mask.sum(axis=0) # vertical summation
                     threshold = np.percentile(column_sum, self.THRESHOLD_PERCENTILE)
                     probable = np.nonzero(column_sum >= threshold) # returns 1 length tuble
-                    if self.DEBUG:
-                        fig = plt.figure()
-                        plt.plot(range(self.CAMERA_WIDTH), column_sum)
-                        plt.show()
-                        time.sleep(0.1)
-                        plt.close(fig)
                     num_probable = len(probable[0])
                     centroid = int(np.median(probable[0])) - self.CAMERA_CENTER
+                    sums.append(column_sum[int(np.median(probable[0]))])
                     indices.append(centroid)
-                except KeyboardInterrupt:
-                    raise KeyboardInterrupt
                 except Exception as error:
                     self.pretty_print('OFF', '%s' % str(error))
             else:
 		indices.append(0)
-	self.pretty_print('OFF', 'Detected indices: %s' % str(indices))
-        b = time.time()
+                sums.append(0)
+	self.pretty_print('OFF', 'Indices: %s' % str(indices))
+        self.pretty_print('OFF', 'Sums: %s' % str(sums))
+	b = time.time()
         self.pretty_print('OFF', '... %.2f ms' % ((b - a) * 1000))
-        return indices
+        #print sums, indices
+	#time.sleep(1)
+        return indices, sums
         
     ## Best Guess for row based on multiple offsets from indices
     """
@@ -317,11 +319,11 @@ class TerreTrak:
     2. Calculate weights of previous offset
     3. Estimate the weighted position of the crop row (in pixels)
     """
-    def estimate_row(self, indices):
+    def estimate_row(self, indices, sums):
         a = time.time()
         self.pretty_print('ROW', 'Estimating row ofset ...')
         try:
-            est =  int(np.mean(indices))
+            est =  int(indices[np.argmax(sums)])
         except Exception as error:
             self.pretty_print('ROW', 'ERROR: %s' % str(error))
             est = self.CAMERA_CENTER
@@ -364,8 +366,6 @@ class TerreTrak:
             elif pwm < self.PWM_MIN:
                 pwm = self.PWM_MIN
             self.pretty_print('PID', 'PWM = %d (%.2f V)' % (pwm, volts))
-        except KeyboardInterrupt:
-            raise KeyboardInterrupt
         except Exception as error:
             pretty_print('PID', 'ERROR: %s' % str(error))
             pwm = self.CENTER_PWM
@@ -383,16 +383,13 @@ class TerreTrak:
         self.pretty_print('CTRL', 'Setting controller state ...')
         try:
             assert self.controller is not None
-            self.controller.flushOutput()
             self.controller.write(str(pwm) + '\n') # Write to PWM adaptor
-            self.pretty_print('CTRL', 'Wrote successfully')
+	    self.pretty_print('CTRL', 'Wrote: %s' % str(pwm))
             duty = self.controller.readline() # try to cast the duty returned to int, if this fails the connection is hanging
             if duty == '':
-                while duty == '':
-                    sduty = self.controller.readline()
-            self.pretty_print('CTRL', 'Feedback: %d' % int(duty))
-        except KeyboardInterrupt:
-            raise KeyboardInterrupt
+	        while duty == '':
+		   duty = self.controller.readline()
+	    self.pretty_print('CTRL', 'Feedback: %d' % int(duty))
         except Exception as error:
             self.pretty_print('CTRL', 'ERROR: %s' % str(error))
             self.reset_controller()
@@ -410,8 +407,6 @@ class TerreTrak:
             assert self.collection is not None
             doc_id = self.collection.insert(sample)
             self.pretty_print('DB', 'Doc ID: %s' % str(doc_id))
-        except KeyboardInterrupt:
-            raise KeyboardInterrupt
         except Exception as error:
             self.pretty_print('DB', 'ERROR: %s' % str(error))
         return doc_id
@@ -424,11 +419,8 @@ class TerreTrak:
     3. Output GUI display
     """
     def update_display(self):
-        a = time.time()
-        if self.updating:
-            return # if the display is already updating, wait and exit (puts less harm on the CPU)
-        else:
-            self.updating = True
+        while True:
+            time.sleep(0.5)
             self.pretty_print('DISP', 'Displaying Images ...')
             try:
                 pwm = self.pwm
@@ -463,16 +455,14 @@ class TerreTrak:
                             cv2.line(img, (average, 0), (average, self.CAMERA_HEIGHT), (0,255,0), 2)
                             cv2.line(img, (self.CAMERA_CENTER, 0), (self.CAMERA_CENTER, self.CAMERA_HEIGHT), (255,255,255), 1)
                         output_images.append(img)
-                    except KeyboardInterrupt:
-                        raise KeyboardInterrupt
                     except Exception as error:
                         self.pretty_print('DISP', 'ERROR: %s' % str(error))
                 self.pretty_print('DISP', 'Stacking images ...')
+		for i in output_images: self.pretty_print('DISP', i.shape)
                 output_small = np.hstack(output_images)
-                self.pretty_print('DISP', 'Padding images ...')
                 pad = np.zeros((self.CAMERA_HEIGHT * 0.1, self.CAMERAS * self.CAMERA_WIDTH, 3), np.uint8) # add blank space
                 output_padded = np.vstack([output_small, pad])
-                self.pretty_print('DISP', 'Resizing output ...')
+                self.pretty_print('DISP', 'Padded image')
                 output_large = cv2.resize(output_padded, (self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT))
 
                 # Offset Distance
@@ -483,8 +473,8 @@ class TerreTrak:
                 cv2.putText(output_large, distance_str, (int(self.DISPLAY_WIDTH * 0.01), int(self.DISPLAY_WIDTH * 0.74)), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
                 
                 # Output Voltage
-                volts_str = str("%2.1f V" % volts)
-                cv2.putText(output_large, volts_str, (int(self.DISPLAY_WIDTH * 0.82), int(self.DISPLAY_WIDTH * 0.74)), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
+                volts_str = str("%1.2f V" % volts)
+                cv2.putText(output_large, volts_str, (int(self.DISPLAY_WIDTH * 0.77), int(self.DISPLAY_WIDTH * 0.74)), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 4)
                 
                 # Arrow
                 if average - self.CAMERA_CENTER >= 0:
@@ -514,14 +504,10 @@ class TerreTrak:
                 cv2.imshow('Agri-Vision', output_large)
                 if cv2.waitKey(5) == 0:
                     pass
-            except KeyboardInterrupt:
-                raise KeyboardInterrupt
             except Exception as error:
                 self.pretty_print('DISP', str(error))
             self.updating = False
-        b = time.time()
-        self.pretty_print('DISP', '... %.2f ms' % ((b - a) * 1000))
-                    
+
     ## Update GPS
     """
     1. Get the most recent GPS data
@@ -595,8 +581,8 @@ class TerreTrak:
             try:
                 images = self.capture_images()
                 masks = self.plant_filter(images)
-                offsets = self.find_offset(masks)
-                (est, avg, diff) = self.estimate_row(offsets)
+                offsets, sums = self.find_offset(masks)
+                (est, avg, diff) = self.estimate_row(offsets, sums)
                 pwm, volts = self.calculate_output(est, avg, diff)
                 err = self.set_controller(pwm)
                 sample = {
@@ -617,12 +603,6 @@ class TerreTrak:
                 self.estimated = est
                 self.volts = volts
                 if self.MONGO_ON: doc_id = self.log_db(sample)
-                if self.DISPLAY_ON:
-                    try:
-                        os.environ['DISPLAY']
-                        thread.start_new_thread(self.update_display, ())
-                    except Exception as error:
-                        self.pretty_print('SYS', 'ERROR: %s' % str(error))
             except KeyboardInterrupt as error:
                 self.close()    
                 break
@@ -631,5 +611,5 @@ class TerreTrak:
 
 ## Main
 if __name__ == '__main__':
-    session = TerreTrak(CONFIG_FILE)
+    session = AgriVision(CONFIG_FILE)
     session.run()
