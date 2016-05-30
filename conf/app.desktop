@@ -2,9 +2,9 @@
 Encoding=UTF-8
 Version=0.9.4
 Type=Application
-Name=app
+Name=TerreTrak
 Comment=
-Exec=$APP_PATH/autostart &
+Exec=/root/terre-trak/autostart &
 StartupNotify=false
 Terminal=false
 Hidden=false
