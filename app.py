@@ -13,13 +13,9 @@ __version__ = '2.01'
 ## Libraries
 import cv2, cv
 import serial
-import pymongo
-from bson import json_util
-from pymongo import MongoClient
 import json
 import numpy as np
 import thread
-import gps
 import time 
 import sys
 from datetime import datetime
@@ -60,8 +56,6 @@ class Application:
         self.init_cameras()
         self.init_controller()
         self.init_pid()
-        self.init_db()
-        self.init_gps()
         self.init_display()
         
     # Initialize Cameras
@@ -112,22 +106,7 @@ class Application:
                 self.pretty_print('CAM', 'Camera #%d OK' % i)
             except Exception as error:
                 self.pretty_print('CAM', 'ERROR: %s' % str(error))
-    
-    # Initialize Database
-    def init_db(self):
-        self.LOG_NAME = datetime.strftime(datetime.now(), self.LOG_FORMAT)
-        self.MONGO_NAME = datetime.strftime(datetime.now(), self.MONGO_FORMAT)
-        self.pretty_print('DB', 'Initializing MongoDB')
-        self.pretty_print('DB', 'Connecting to MongoDB: %s' % self.MONGO_NAME)
-        self.pretty_print('DB', 'New session: %s' % self.LOG_NAME)
-        try:
-            self.client = MongoClient()
-            self.database = self.client[self.MONGO_NAME]
-            self.collection = self.database[self.LOG_NAME]
-            self.pretty_print('DB', 'Setup OK')
-        except Exception as error:
-            pretty_print('DB', 'ERROR: %s' % str(error))
-    
+      
     # Initialize PID Controller
     def init_pid(self):
         self.pretty_print('PID', 'Initialing Electro-Hydraulics')
@@ -169,21 +148,7 @@ class Application:
             self.pretty_print('CTRL', 'Setup OK')
         except Exception as error:
             self.pretty_print('CTRL', 'ERROR: %s' % str(error))
-        
-    # Initialize GPS
-    def init_gps(self):
-        self.pretty_print('GPS', 'Initializing GPS ...')
-        self.latitude = 0
-        self.longitude = 0
-        self.speed = 0
-        try:
-            self.pretty_print('GPS', 'Enabing GPS ...')
-            self.gpsd = gps.gps()
-            self.gpsd.stream(gps.WATCH_ENABLE)
-            thread.start_new_thread(self.update_gps, ())
-        except Exception as err:
-            self.pretty_print('GPS', 'WARNING: GPS not available! %s' % str(err))
-    
+            
     # Display
     def init_display(self):
         self.pretty_print('INIT', 'Initializing Display')
@@ -207,23 +172,20 @@ class Application:
     2. Repeat for each capture interface
     """
     def capture_images(self):
-        a = time.time()
-        self.pretty_print('CAM', 'Capturing Images ...')
         images = []
         for i in range(self.CAMERAS):
-            self.pretty_print('CAM', 'Attempting on Camera #%d' % i)
             try:
                 (s, bgr) = self.cameras[i].read()
                 if s and (self.images[i] is not None):
                     if self.CAMERA_ROTATED: bgr = self.rotate_image(bgr)
                     if np.all(bgr==self.images[i]):
                         images.append(None)
-                        self.pretty_print('CAM', 'ERROR: Frozen frame')
+                        self.pretty_print('CAM', 'ERROR: Frozen frame on camera %d' % i)
                     else:
                         self.pretty_print('CAM', 'Capture successful: %s' % str(bgr.shape))
                         images.append(bgr)
                 else:
-                    self.pretty_print('CAM', 'ERROR: Capture failed')
+                    self.pretty_print('CAM', 'ERROR: Capture on cam %d failed' % i)
                     self.cameras[i].release()
                     self.cameras[i] = cv2.VideoCapture(i)
                     self.cameras[i].set(cv.CV_CAP_PROP_SATURATION, self.CAMERA_SATURATION)
@@ -238,8 +200,6 @@ class Application:
                         images.append(None)
             except:
                 images.append(None)
-        b = time.time()
-        self.pretty_print('CAM', '... %.2f ms' % ((b - a) * 1000))
         return images
         
     ## Plant Segmentation Filter
@@ -250,8 +210,6 @@ class Application:
     4. Take hues within range from green-yellow to green-blue
     """
     def plant_filter(self, images):
-        self.pretty_print('BPPD', 'Filtering for plants ...')
-        a = time.time()
         masks = []
         for bgr in images:
             if bgr is not None:
@@ -271,8 +229,6 @@ class Application:
             else:
                 self.pretty_print('BPPD', 'Mask Number #%d is blank' % len(masks))
                 masks.append(None)
-        b = time.time()
-        self.pretty_print('BPPD', '... %.2f ms' % ((b - a) * 1000))
         return masks
         
     ## Find Plants
@@ -284,7 +240,6 @@ class Application:
     5. Repeat for each mask
     """
     def find_offset(self, masks):
-        a = time.time()
         indices = []
         sums = []
         for mask in masks:
@@ -302,13 +257,7 @@ class Application:
             else:
 		indices.append(0)
                 sums.append(0)
-	self.pretty_print('OFF', 'Indices: %s' % str(indices))
-        self.pretty_print('OFF', 'Sums: %s' % str(sums))
-	b = time.time()
-        self.pretty_print('OFF', '... %.2f ms' % ((b - a) * 1000))
-        #print sums, indices
-	#time.sleep(1)
-        return indices, sums
+	return indices, sums
         
     ## Best Guess for row based on multiple offsets from indices
     """
@@ -319,8 +268,6 @@ class Application:
     3. Estimate the weighted position of the crop row (in pixels)
     """
     def estimate_row(self, indices, sums):
-        a = time.time()
-        self.pretty_print('ROW', 'Estimating row ofset ...')
         try:
             est =  int(indices[np.argmax(sums)])
         except Exception as error:
@@ -329,14 +276,8 @@ class Application:
         self.offset_history.append(est)
         while len(self.offset_history) > self.NUM_AVERAGES:
             self.offset_history.pop(0)
-        avg = int(np.mean(self.offset_history)) #!TODO
-        diff = est - avg #!TODO can be a little more clever e.g. np.gradient, np.convolve
-        if self.VERBOSE:
-            self.pretty_print('ROW', 'Est = %.2f' % est)
-            self.pretty_print('ROW', 'Avg = %.2f' % avg)
-            self.pretty_print('ROW', 'Diff.= %.2f' % diff)
-        b = time.time()
-        self.pretty_print('ROW', '... %.2f ms' % ((b - a) * 1000))
+        avg = int(np.mean(self.offset_history))
+        diff = np.mean(np.gradient(np.array(self.offset_history)))
         return est, avg, diff
          
     ## Control Hydraulics
@@ -347,15 +288,10 @@ class Application:
     Returns: PWM
     """
     def calculate_output(self, estimate, average, diff):
-        a = time.time()
-        self.pretty_print('PID', 'Calculating PID Output ...')
         try:
             p = estimate * self.P_COEF
             i = average * self.I_COEF
             d = diff  * self.D_COEF
-            self.pretty_print('PID', "P = %.1f" % p)
-            self.pretty_print('PID', "I = %.1f" % i)
-            self.pretty_print('PID', "D = %.1f" % d)            
             pwm = int(p + i + d + self.CENTER_PWM) # offset to zero
             if pwm > self.PWM_MAX: pwm = self.PWM_MAX
             elif pwm < self.PWM_MIN: pwm = self.PWM_MIN
@@ -368,8 +304,6 @@ class Application:
         except Exception as error:
             pretty_print('PID', 'ERROR: %s' % str(error))
             pwm = self.CENTER_PWM
-        b = time.time()
-        self.pretty_print('PID', '... %.2f ms' % ((b - a) * 1000))
         return pwm, volts
 
     ## Control Hydraulics
@@ -378,7 +312,6 @@ class Application:
     2. Send PWM response over serial to controller
     """
     def set_controller(self, pwm):
-        a = time.time()
         self.pretty_print('CTRL', 'Setting controller state ...')
         try:
             assert self.controller is not None
@@ -392,24 +325,7 @@ class Application:
         except Exception as error:
             self.pretty_print('CTRL', 'ERROR: %s' % str(error))
             self.reset_controller()
-        b = time.time()
-        self.pretty_print('CTRL', '... %.2f ms' % ((b - a) * 1000))
-    
-    ## Log to Mongo
-    """
-    1. Log results to the database
-    2. Returns Doc ID
-    """
-    def log_db(self, sample):
-        self.pretty_print('DB', 'Logging to Database ...')
-        try:          
-            assert self.collection is not None
-            doc_id = self.collection.insert(sample)
-            self.pretty_print('DB', 'Doc ID: %s' % str(doc_id))
-        except Exception as error:
-            self.pretty_print('DB', 'ERROR: %s' % str(error))
-        return doc_id
-    
+     
     ## Update the Display
     """
     0. Check for concurrent update process
@@ -507,23 +423,7 @@ class Application:
                 self.pretty_print('DISP', str(error))
             self.updating = False
 
-    ## Update GPS
-    """
-    1. Get the most recent GPS data
-    2. Set global variables for lat, long and speed
-    """
-    def update_gps(self):  
-        while True:
-            time.sleep(1) # GPS update time
-            self.gpsd.next()
-            self.latitude = self.gpsd.fix.latitude
-            self.longitude = self.gpsd.fix.longitude
-            self.speed = self.gpsd.fix.speed
-            self.pretty_print('GPS', '%d N %d E' % (self.latitude, self.longitude))
-    
-    """
-    Reset Controller
-    """
+    # Reset Controller
     def reset_controller(self):
         self.pretty_print('SYSTEM', 'Resetting Controller ...')
         try:
@@ -584,24 +484,14 @@ class Application:
                 (est, avg, diff) = self.estimate_row(offsets, sums)
                 pwm, volts = self.calculate_output(est, avg, diff)
                 err = self.set_controller(pwm)
-                sample = {
-                    'offsets' : offsets, 
-                    'estimated' : est,
-                    'average' : avg,
-                    'differential' : diff,
-                    'pwm': pwm,
-                    'time' : datetime.strftime(datetime.now(), self.TIME_FORMAT),
-                    'long' : self.longitude,
-                    'lat' : self.latitude,
-                    'speed' : self.speed,
-                }
+
+                # Write values for threads  
                 self.pwm = pwm
                 self.images = images
                 self.masks = masks
                 self.average = avg
                 self.estimated = est
                 self.volts = volts
-                if self.MONGO_ON: doc_id = self.log_db(sample)
             except KeyboardInterrupt as error:
                 self.close()    
                 break
