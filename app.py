@@ -329,8 +329,8 @@ class Application:
         self.offset_history.append(est)
         while len(self.offset_history) > self.NUM_AVERAGES:
             self.offset_history.pop(0)
-        avg = int(np.mean(self.offset_history)) #!TODO
-        diff = est - avg #!TODO can be a little more clever e.g. np.gradient, np.convolve
+        avg = int(np.mean(self.offset_history))
+        diff = np.mean(np.gradient(self.offset_history))
         if self.VERBOSE:
             self.pretty_print('ROW', 'Est = %.2f' % est)
             self.pretty_print('ROW', 'Avg = %.2f' % avg)
