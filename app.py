@@ -172,23 +172,20 @@ class Application:
     2. Repeat for each capture interface
     """
     def capture_images(self):
-        a = time.time()
-        self.pretty_print('CAM', 'Capturing Images ...')
         images = []
         for i in range(self.CAMERAS):
-            self.pretty_print('CAM', 'Attempting on Camera #%d' % i)
             try:
                 (s, bgr) = self.cameras[i].read()
                 if s and (self.images[i] is not None):
                     if self.CAMERA_ROTATED: bgr = self.rotate_image(bgr)
                     if np.all(bgr==self.images[i]):
                         images.append(None)
-                        self.pretty_print('CAM', 'ERROR: Frozen frame')
+                        self.pretty_print('CAM', 'ERROR: Frozen frame on camera %d' % i)
                     else:
                         self.pretty_print('CAM', 'Capture successful: %s' % str(bgr.shape))
                         images.append(bgr)
                 else:
-                    self.pretty_print('CAM', 'ERROR: Capture failed')
+                    self.pretty_print('CAM', 'ERROR: Capture on cam %d failed' % i)
                     self.cameras[i].release()
                     self.cameras[i] = cv2.VideoCapture(i)
                     self.cameras[i].set(cv.CV_CAP_PROP_SATURATION, self.CAMERA_SATURATION)
@@ -203,9 +200,6 @@ class Application:
                         images.append(None)
             except:
                 images.append(None)
-
-        b = time.time()
-        self.pretty_print('CAM', '... %.2f ms' % ((b - a) * 1000))
         return images
         
     ## Plant Segmentation Filter
@@ -216,8 +210,6 @@ class Application:
     4. Take hues within range from green-yellow to green-blue
     """
     def plant_filter(self, images):
-        self.pretty_print('BPPD', 'Filtering for plants ...')
-        a = time.time()
         masks = []
         for bgr in images:
             if bgr is not None:
@@ -237,8 +229,6 @@ class Application:
             else:
                 self.pretty_print('BPPD', 'Mask Number #%d is blank' % len(masks))
                 masks.append(None)
-        b = time.time()
-        self.pretty_print('BPPD', '... %.2f ms' % ((b - a) * 1000))
         return masks
         
     ## Find Plants
@@ -250,7 +240,6 @@ class Application:
     5. Repeat for each mask
     """
     def find_offset(self, masks):
-        a = time.time()
         indices = []
         sums = []
         for mask in masks:
@@ -268,11 +257,6 @@ class Application:
             else:
 		indices.append(0)
                 sums.append(0)
-	self.pretty_print('OFF', 'Indices: %s' % str(indices))
-        self.pretty_print('OFF', 'Sums: %s' % str(sums))
-	b = time.time()
-        self.pretty_print('OFF', '... %.2f ms' % ((b - a) * 1000))
-        #print sums, indices
 	return indices, sums
         
     ## Best Guess for row based on multiple offsets from indices
@@ -284,8 +268,6 @@ class Application:
     3. Estimate the weighted position of the crop row (in pixels)
     """
     def estimate_row(self, indices, sums):
-        a = time.time()
-        self.pretty_print('ROW', 'Estimating row ofset ...')
         try:
             est =  int(indices[np.argmax(sums)])
         except Exception as error:
@@ -296,12 +278,6 @@ class Application:
             self.offset_history.pop(0)
         avg = int(np.mean(self.offset_history))
         diff = np.mean(np.gradient(np.array(self.offset_history)))
-        if self.VERBOSE:
-            self.pretty_print('ROW', 'Est = %.2f' % est)
-            self.pretty_print('ROW', 'Avg = %.2f' % avg)
-            self.pretty_print('ROW', 'Diff.= %.2f' % diff)
-        b = time.time()
-        self.pretty_print('ROW', '... %.2f ms' % ((b - a) * 1000))
         return est, avg, diff
          
     ## Control Hydraulics
@@ -312,15 +288,10 @@ class Application:
     Returns: PWM
     """
     def calculate_output(self, estimate, average, diff):
-        a = time.time()
-        self.pretty_print('PID', 'Calculating PID Output ...')
         try:
             p = estimate * self.P_COEF
             i = average * self.I_COEF
             d = diff  * self.D_COEF
-            self.pretty_print('PID', "P = %.1f" % p)
-            self.pretty_print('PID', "I = %.1f" % i)
-            self.pretty_print('PID', "D = %.1f" % d)            
             pwm = int(p + i + d + self.CENTER_PWM) # offset to zero
             if pwm > self.PWM_MAX: pwm = self.PWM_MAX
             elif pwm < self.PWM_MIN: pwm = self.PWM_MIN
@@ -333,8 +304,6 @@ class Application:
         except Exception as error:
             pretty_print('PID', 'ERROR: %s' % str(error))
             pwm = self.CENTER_PWM
-        b = time.time()
-        self.pretty_print('PID', '... %.2f ms' % ((b - a) * 1000))
         return pwm, volts
 
     ## Control Hydraulics
@@ -343,7 +312,6 @@ class Application:
     2. Send PWM response over serial to controller
     """
     def set_controller(self, pwm):
-        a = time.time()
         self.pretty_print('CTRL', 'Setting controller state ...')
         try:
             assert self.controller is not None
@@ -357,8 +325,6 @@ class Application:
         except Exception as error:
             self.pretty_print('CTRL', 'ERROR: %s' % str(error))
             self.reset_controller()
-        b = time.time()
-        self.pretty_print('CTRL', '... %.2f ms' % ((b - a) * 1000))
      
     ## Update the Display
     """
