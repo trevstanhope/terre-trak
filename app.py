@@ -13,13 +13,9 @@ __version__ = '2.01'
 ## Libraries
 import cv2, cv
 import serial
-import pymongo
-from bson import json_util
-from pymongo import MongoClient
 import json
 import numpy as np
 import thread
-import gps
 import time 
 import sys
 from datetime import datetime
@@ -207,6 +203,7 @@ class Application:
                         images.append(None)
             except:
                 images.append(None)
+
         b = time.time()
         self.pretty_print('CAM', '... %.2f ms' % ((b - a) * 1000))
         return images
