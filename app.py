@@ -30,8 +30,7 @@ import os
 try:
     CONFIG_FILE = '%s' % sys.argv[1]
 except Exception as err:
-    settings = open('settings.cfg').read()
-    CONFIG_FILE = settings.rstrip()
+    CONFIG_FILE = 'settings.json'
 
 ## Class
 class Application:

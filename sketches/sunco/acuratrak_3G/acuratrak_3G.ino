@@ -38,11 +38,11 @@ void loop(void) {
   
   // Run calibrate sequence if the blue button is pressed
   if (!digitalRead(CALIBRATE_PIN)) {
-     analogWrite(OUTPUT_PIN, i);
-     delay(CALIBRATION_DELAY);
-     analogWrite(OUTPUT_PIN, i);
-     delay(CALIBRATION_DELAY);
-     duty = 128;
+    analogWrite(OUTPUT_PIN, PWM_MIN);
+    delay(CALIBRATION_DELAY);
+    analogWrite(OUTPUT_PIN, PWM_MAX);
+    delay(CALIBRATION_DELAY);
+    duty = 128;
   }
   
   // Otherwise use convert the value read over serial to PWM range 
