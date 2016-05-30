@@ -60,8 +60,6 @@ class Application:
         self.init_cameras()
         self.init_controller()
         self.init_pid()
-        self.init_db()
-        self.init_gps()
         self.init_display()
         
     # Initialize Cameras
@@ -112,22 +110,7 @@ class Application:
                 self.pretty_print('CAM', 'Camera #%d OK' % i)
             except Exception as error:
                 self.pretty_print('CAM', 'ERROR: %s' % str(error))
-    
-    # Initialize Database
-    def init_db(self):
-        self.LOG_NAME = datetime.strftime(datetime.now(), self.LOG_FORMAT)
-        self.MONGO_NAME = datetime.strftime(datetime.now(), self.MONGO_FORMAT)
-        self.pretty_print('DB', 'Initializing MongoDB')
-        self.pretty_print('DB', 'Connecting to MongoDB: %s' % self.MONGO_NAME)
-        self.pretty_print('DB', 'New session: %s' % self.LOG_NAME)
-        try:
-            self.client = MongoClient()
-            self.database = self.client[self.MONGO_NAME]
-            self.collection = self.database[self.LOG_NAME]
-            self.pretty_print('DB', 'Setup OK')
-        except Exception as error:
-            pretty_print('DB', 'ERROR: %s' % str(error))
-    
+      
     # Initialize PID Controller
     def init_pid(self):
         self.pretty_print('PID', 'Initialing Electro-Hydraulics')
@@ -169,21 +152,7 @@ class Application:
             self.pretty_print('CTRL', 'Setup OK')
         except Exception as error:
             self.pretty_print('CTRL', 'ERROR: %s' % str(error))
-        
-    # Initialize GPS
-    def init_gps(self):
-        self.pretty_print('GPS', 'Initializing GPS ...')
-        self.latitude = 0
-        self.longitude = 0
-        self.speed = 0
-        try:
-            self.pretty_print('GPS', 'Enabing GPS ...')
-            self.gpsd = gps.gps()
-            self.gpsd.stream(gps.WATCH_ENABLE)
-            thread.start_new_thread(self.update_gps, ())
-        except Exception as err:
-            self.pretty_print('GPS', 'WARNING: GPS not available! %s' % str(err))
-    
+            
     # Display
     def init_display(self):
         self.pretty_print('INIT', 'Initializing Display')
@@ -307,8 +276,7 @@ class Application:
 	b = time.time()
         self.pretty_print('OFF', '... %.2f ms' % ((b - a) * 1000))
         #print sums, indices
-	#time.sleep(1)
-        return indices, sums
+	return indices, sums
         
     ## Best Guess for row based on multiple offsets from indices
     """
@@ -330,7 +298,7 @@ class Application:
         while len(self.offset_history) > self.NUM_AVERAGES:
             self.offset_history.pop(0)
         avg = int(np.mean(self.offset_history))
-        diff = np.mean(np.gradient(self.offset_history))
+        diff = np.mean(np.gradient(np.array(self.offset_history)))
         if self.VERBOSE:
             self.pretty_print('ROW', 'Est = %.2f' % est)
             self.pretty_print('ROW', 'Avg = %.2f' % avg)
@@ -394,22 +362,7 @@ class Application:
             self.reset_controller()
         b = time.time()
         self.pretty_print('CTRL', '... %.2f ms' % ((b - a) * 1000))
-    
-    ## Log to Mongo
-    """
-    1. Log results to the database
-    2. Returns Doc ID
-    """
-    def log_db(self, sample):
-        self.pretty_print('DB', 'Logging to Database ...')
-        try:          
-            assert self.collection is not None
-            doc_id = self.collection.insert(sample)
-            self.pretty_print('DB', 'Doc ID: %s' % str(doc_id))
-        except Exception as error:
-            self.pretty_print('DB', 'ERROR: %s' % str(error))
-        return doc_id
-    
+     
     ## Update the Display
     """
     0. Check for concurrent update process
@@ -507,23 +460,7 @@ class Application:
                 self.pretty_print('DISP', str(error))
             self.updating = False
 
-    ## Update GPS
-    """
-    1. Get the most recent GPS data
-    2. Set global variables for lat, long and speed
-    """
-    def update_gps(self):  
-        while True:
-            time.sleep(1) # GPS update time
-            self.gpsd.next()
-            self.latitude = self.gpsd.fix.latitude
-            self.longitude = self.gpsd.fix.longitude
-            self.speed = self.gpsd.fix.speed
-            self.pretty_print('GPS', '%d N %d E' % (self.latitude, self.longitude))
-    
-    """
-    Reset Controller
-    """
+    # Reset Controller
     def reset_controller(self):
         self.pretty_print('SYSTEM', 'Resetting Controller ...')
         try:
@@ -584,24 +521,14 @@ class Application:
                 (est, avg, diff) = self.estimate_row(offsets, sums)
                 pwm, volts = self.calculate_output(est, avg, diff)
                 err = self.set_controller(pwm)
-                sample = {
-                    'offsets' : offsets, 
-                    'estimated' : est,
-                    'average' : avg,
-                    'differential' : diff,
-                    'pwm': pwm,
-                    'time' : datetime.strftime(datetime.now(), self.TIME_FORMAT),
-                    'long' : self.longitude,
-                    'lat' : self.latitude,
-                    'speed' : self.speed,
-                }
+
+                # Write values for threads  
                 self.pwm = pwm
                 self.images = images
                 self.masks = masks
                 self.average = avg
                 self.estimated = est
                 self.volts = volts
-                if self.MONGO_ON: doc_id = self.log_db(sample)
             except KeyboardInterrupt as error:
                 self.close()    
                 break
