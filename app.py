@@ -360,7 +360,7 @@ class Application:
                         else:
                             cv2.line(img, (self.PIXEL_MIN, 0), (self.PIXEL_MIN, self.CAMERA_HEIGHT), (0,0,255), 1)
                             cv2.line(img, (self.PIXEL_MAX, 0), (self.PIXEL_MAX, self.CAMERA_HEIGHT), (0,0,255), 1)
-                            cv2.line(img, (average, 0), (average, self.CAMERA_HEIGHT), (0,255,0), 2)
+                            cv2.line(img, (average, 0), (average, self.CAMERA_HEIGHT), (0,255,0), 1)
                             cv2.line(img, (self.CAMERA_CENTER, 0), (self.CAMERA_CENTER, self.CAMERA_HEIGHT), (255,255,255), 1)
                         output_images.append(img)
                     except Exception as error:
