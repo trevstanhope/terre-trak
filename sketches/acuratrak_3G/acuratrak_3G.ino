@@ -17,7 +17,7 @@ const unsigned long BAUD = 9600;
 const unsigned int RESOLUTION = 255;
 const unsigned int PWM_MIN = 93; // 1.25 V + 4 bits = 1.33 V
 const unsigned int PWM_MAX = 169; // 3.75 V - 4 bits = 1.69 V
-const unsigned int CALIBRATION_DELAY = 5000; // ms for each voltage interval
+const unsigned int CALIBRATION_DELAY = 1500; // ms for each voltage interval
 const unsigned int PWM_CENTER = (PWM_MAX + PWM_MIN) / 2; // start at zero of effective range from PWM_MIN to PWM_MAX
 
 /* --- Variables --- */
