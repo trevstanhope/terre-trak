@@ -312,7 +312,6 @@ class Application:
     2. Send PWM response over serial to controller
     """
     def set_controller(self, pwm):
-        self.pretty_print('CTRL', 'Setting controller state ...')
         try:
             assert self.controller is not None
             self.controller.write(str(pwm) + '\n') # Write to PWM adaptor
@@ -335,8 +334,7 @@ class Application:
     """
     def update_display(self):
         while True:
-            time.sleep(0.5)
-            self.pretty_print('DISP', 'Displaying Images ...')
+            time.sleep(self.DISPLAY_FREQ)
             try:
                 pwm = self.pwm
                 average = self.average + self.CAMERA_CENTER
@@ -346,24 +344,19 @@ class Application:
                 volts = self.volts
                 output_images = []
                 distance = round((average - self.CAMERA_CENTER) / float(self.PIXEL_PER_CM), 1)
-                self.pretty_print('DISP', 'Offset Distance: %d' % distance)
                 for i in xrange(self.CAMERAS):
                     try:
-                        self.pretty_print('DISP', 'Image #%d' % (i+1))
                         img = images[i]
                         mask = masks[i]
                         if img is None: img = np.zeros((self.CAMERA_HEIGHT, self.CAMERA_WIDTH, 3), np.uint8)
                         if mask is None: mask = np.zeros((self.CAMERA_HEIGHT, self.CAMERA_WIDTH), np.uint8)
                         (h, w, d) = img.shape
-                        self.pretty_print('DISP', 'Mask shape: %s' % str(mask.shape))
-                        self.pretty_print('DISP', 'Img shape: %s' % str(img.shape))
                         if self.HIGHLIGHT:
                             img = np.dstack((mask, mask, mask))
                             img[:, self.PIXEL_MIN, 2] =  255
                             img[:, self.PIXEL_MAX, 2] =  255
                             img[:, self.CAMERA_CENTER, 1] =  255
                             img[:, average, 0] = 255
-                            self.pretty_print('DISP', 'Highlighted detected plants')
                         else:
                             cv2.line(img, (self.PIXEL_MIN, 0), (self.PIXEL_MIN, self.CAMERA_HEIGHT), (0,0,255), 1)
                             cv2.line(img, (self.PIXEL_MAX, 0), (self.PIXEL_MAX, self.CAMERA_HEIGHT), (0,0,255), 1)
@@ -372,12 +365,10 @@ class Application:
                         output_images.append(img)
                     except Exception as error:
                         self.pretty_print('DISP', 'ERROR: %s' % str(error))
-                self.pretty_print('DISP', 'Stacking images ...')
 		for i in output_images: self.pretty_print('DISP', i.shape)
                 output_small = np.hstack(output_images)
                 pad = np.zeros((self.CAMERA_HEIGHT * 0.1, self.CAMERAS * self.CAMERA_WIDTH, 3), np.uint8) # add blank space
                 output_padded = np.vstack([output_small, pad])
-                self.pretty_print('DISP', 'Padded image')
                 output_large = cv2.resize(output_padded, (self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT))
 
                 # Offset Distance
@@ -413,10 +404,9 @@ class Application:
                 cv2.line(output_large, p, q, color, thickness, line_type, shift) # draw second half of arrow head
                 
                 # Draw GUI
-                cv2.namedWindow('Agri-Vision', cv2.WINDOW_NORMAL)
-                if self.FULLSCREEN: cv2.setWindowProperty('Agri-Vision', cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
-                self.pretty_print('DISP', 'Output shape: %s' % str(output_large.shape))
-                cv2.imshow('Agri-Vision', output_large)
+                cv2.namedWindow('TerreTrak', cv2.WINDOW_NORMAL)
+                if self.FULLSCREEN: cv2.setWindowProperty('TerreTrak', cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
+                cv2.imshow('TerreTrak', output_large)
                 if cv2.waitKey(5) == 0:
                     pass
             except Exception as error:
@@ -425,7 +415,6 @@ class Application:
 
     # Reset Controller
     def reset_controller(self):
-        self.pretty_print('SYSTEM', 'Resetting Controller ...')
         try:
 	    self.controller.close()
 	except Exception as error:

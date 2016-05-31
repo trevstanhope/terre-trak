@@ -1,6 +1,7 @@
 {
     "PWM_MIN" : 1,
-    "PWM_MAX" : 256,
+    "PWM_MAX" : 255,
+    "DISPLAY_FREQ" : 0.5,
     "DISPLAY_WIDTH" : 1024,
     "DISPLAY_HEIGHT" : 768,
     "FULLSCREEN" : true,

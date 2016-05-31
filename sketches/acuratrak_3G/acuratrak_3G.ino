@@ -15,12 +15,13 @@
 /* --- Constants --- */ 
 const unsigned long BAUD = 9600;
 const unsigned int RESOLUTION = 255;
-const unsigned int PWM_MIN = 68; // 1.25 V + 4 bits = 1.33 V
-const unsigned int PWM_MAX = 188; // 3.75 V - 4 bits = 1.69 V
-const unsigned int CALIBRATION_DELAY = 50; // ms for each voltage interval
+const unsigned int PWM_MIN = 93; // 1.25 V + 4 bits = 1.33 V
+const unsigned int PWM_MAX = 169; // 3.75 V - 4 bits = 1.69 V
+const unsigned int CALIBRATION_DELAY = 5000; // ms for each voltage interval
+const unsigned int PWM_CENTER = (PWM_MAX + PWM_MIN) / 2; // start at zero of effective range from PWM_MIN to PWM_MAX
 
 /* --- Variables --- */
-int duty = (PWM_MAX + PWM_MIN) / 2; // start at zero of effective range from PWM_MIN to PWM_MAX
+int duty_cycle = PWM_CENTER;
 
 /* --- Setup --- */
 void setup(void) {
@@ -34,7 +35,7 @@ void loop(void) {
   
   // Parse serial input
   int val = Serial.parseInt();
-  if (val == 0) { val = 128; }
+  if (val == 0) { val = PWM_CENTER; }
   
   // Run calibrate sequence if the blue button is pressed
   if (!digitalRead(CALIBRATE_PIN)) {
@@ -42,16 +43,16 @@ void loop(void) {
     delay(CALIBRATION_DELAY);
     analogWrite(OUTPUT_PIN, PWM_MAX);
     delay(CALIBRATION_DELAY);
-    duty = 128;
+    duty_cycle = PWM_CENTER;
   }
   
   // Otherwise use convert the value read over serial to PWM range 
   else {
-    duty = map(val, 0, RESOLUTION, PWM_MIN, PWM_MAX);
-    if (duty > PWM_MAX) { duty = PWM_MAX; } // over-limit
-    if (duty < PWM_MIN) { duty = PWM_MIN; } // under-limit (also handles no match
-    analogWrite(OUTPUT_PIN, duty); // write to pwm output
+    duty_cycle = map(val, 1, RESOLUTION, PWM_MIN, PWM_MAX);
+    if (duty_cycle > PWM_MAX) { duty_cycle = PWM_MAX; } // over-limit
+    if (duty_cycle < PWM_MIN) { duty_cycle = PWM_MIN; } // under-limit (also handles no match
+    analogWrite(OUTPUT_PIN, duty_cycle); // write to pwm output
   }
-  Serial.println(duty);
+  Serial.println(duty_cycle);
   Serial.flush();
 }
