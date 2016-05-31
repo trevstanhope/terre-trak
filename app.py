@@ -219,8 +219,6 @@ class Application:
                     v_mean = np.mean(hsv[:,:,2])
                     self.threshold_min[1] = s_mean # overwrite the saturation minima
                     self.threshold_min[2] = v_mean # overwrite the value minima
-                    self.pretty_print('BPPD', 'Smean = %.1f' % (s_mean))
-                    self.pretty_print('BPPD', 'Vmean = %.1f' % (v_mean))
                     mask = np.ceil(cv2.inRange(hsv, self.threshold_min, self.threshold_max) / 255.0)
 		    masks.append(mask)
                     self.pretty_print('BPPD', 'Mask Number #%d was successful' % len(masks))                    
@@ -255,7 +253,7 @@ class Application:
                 except Exception as error:
                     self.pretty_print('OFF', '%s' % str(error))
             else:
-		indices.append(0)
+	        indices.append(np.NAN)
                 sums.append(0)
 	return indices, sums
         
@@ -267,9 +265,25 @@ class Application:
     2. Calculate weights of previous offset
     3. Estimate the weighted position of the crop row (in pixels)
     """
-    def estimate_row(self, indices, sums):
+    def estimate_row(self, idx, sums):
+        idx = np.array(idx)
+        sums = np.array(sums)
+        l = np.count_nonzero(np.isnan(idx))
         try:
-            est =  int(indices[np.argmax(sums)])
+            if l == 0:
+                if abs(np.mean(np.gradient(idx))) > self.PIXEL_RANGE:
+                    est = int(idx[np.argmax(sums)]) 
+                else:
+                    norm = np.mean(sums)
+                    if norm == 0:
+                        est = 0
+                    else: 
+                        weights = sums / norm
+                        est = int(np.average(idx, weights=weights))
+            else: 
+                idx = idx[~np.isnan(idx)]
+                sums = sums[~np.isnan(sums)]
+                est = int(idx[np.argmax(sums)]) 
         except Exception as error:
             self.pretty_print('ROW', 'ERROR: %s' % str(error))
             est = self.CAMERA_CENTER
