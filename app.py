@@ -130,9 +130,12 @@ class Application:
         self.LOG_NAME = datetime.strftime(datetime.now(), self.LOG_FORMAT)
         self.pretty_print('LOG', 'New log file: %s' % self.LOG_NAME)
         try:
-            self.log = open('logs/' + self.LOG_NAME + '.csv', 'w')
-            self.log.write(','.join(['time', 'lat', 'long', 'speed', 'cam0', 'cam1', 'estimate', 'average', 'pwm','\n']))
-            self.pretty_print('LOG', 'Setup OK')
+            if self.LOGFILE_ON: 
+                self.log = open('logs/' + self.LOG_NAME + '.csv', 'w')
+                self.log.write(','.join(['time', 'lat', 'long', 'speed', 'cam0', 'cam1', 'estimate', 'average', 'pwm','\n']))
+                self.pretty_print('LOG', 'Setup OK')
+            else:
+                self.pretty_print('LOG', 'Logging is disabled')
         except Exception as error:
             self.pretty_print('ERROR', str(error))
             
