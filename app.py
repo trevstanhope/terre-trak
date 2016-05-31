@@ -63,8 +63,6 @@ class Application:
         
         # Setting variables
         self.pretty_print('CAM', 'Initializing CV Variables')
-        if self.CAMERA_ROTATED:
-            self.CAMERA_HEIGHT, self.CAMERA_WIDTH = self.CAMERA_WIDTH, self.CAMERA_HEIGHT # flip dimensions if rotated
         self.CAMERA_CENTER = self.CAMERA_WIDTH / 2
         self.pretty_print('CAM', 'Camera Width: %d px' % self.CAMERA_WIDTH)
         self.pretty_print('CAM', 'Camera Height: %d px' % self.CAMERA_HEIGHT)
@@ -180,7 +178,6 @@ class Application:
             try:
                 (s, bgr) = self.cameras[i].read()
                 if s and (self.images[i] is not None):
-                    if self.CAMERA_ROTATED: bgr = self.rotate_image(bgr)
                     if np.all(bgr==self.images[i]):
                         images.append(None)
                         self.pretty_print('CAM', 'ERROR: Frozen frame on camera %d' % i)
