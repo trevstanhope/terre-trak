@@ -365,7 +365,6 @@ class Application:
                         output_images.append(img)
                     except Exception as error:
                         self.pretty_print('DISP', 'ERROR: %s' % str(error))
-		for i in output_images: self.pretty_print('DISP', i.shape)
                 output_small = np.hstack(output_images)
                 pad = np.zeros((self.CAMERA_HEIGHT * 0.1, self.CAMERAS * self.CAMERA_WIDTH, 3), np.uint8) # add blank space
                 output_padded = np.vstack([output_small, pad])
@@ -410,7 +409,7 @@ class Application:
                 if cv2.waitKey(5) == 0:
                     pass
             except Exception as error:
-                self.pretty_print('DISP', str(error))
+                self.pretty_print('DISP', 'WARNING:' + str(error))
             self.updating = False
 
     # Reset Controller
